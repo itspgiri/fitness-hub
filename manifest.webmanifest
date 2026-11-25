@@ -1,0 +1,9 @@
+{
+  "name": "Fitness Hub",
+  "short_name": "Fitness Hub",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a"
+}

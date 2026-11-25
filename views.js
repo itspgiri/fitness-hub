@@ -26,7 +26,7 @@ function hrPill(hr, z2Hi) {
 }
 
 // =============================================================================
-// VIEW 1: TODAY COMMAND CENTER
+// VIEW 1: TODAY COMMAND CENTER (WHOOP / ULTRAHUMAN / APPLE MINIMALISM)
 // =============================================================================
 
 export function renderTodayView(hub, state, redraw) {
@@ -42,27 +42,32 @@ export function renderTodayView(hub, state, redraw) {
   const sTarget = stepTarget(hub);
   const z2Lo = zone2Low(hub);
   const z2Hi = zone2Max(hub);
+  const race = nextRace(hub, today);
 
-  // Page head
+  const activeToggleCount = Object.values(state.toggles).filter(Boolean).length;
+
+  // Minimalist Apple-style Header
   frag.appendChild(el('div', { class: 'page-head' }, [
     el('div', {}, [
-      el('h1', { class: 'page-title', text: `Today • ${prettyDate(today, true)}` }),
-      el('p', {
-        class: 'page-sub',
-        text: wv.weekNum
-          ? `Runna Week ${wv.weekNum} of 21 • Target ${wv.weekKm ?? '—'} km (${wv.runKm} km logged) • Zone 2 cap ${z2Lo}–${z2Hi} bpm`
-          : `Zone 2 cap ${z2Lo}–${z2Hi} bpm • Daily step floor ${sTarget.toLocaleString()}`,
-      }),
+      el('div', { class: 'page-kicker', text: `${prettyDate(today, true)} • ${wv.weekNum ? `Runna Week ${wv.weekNum} of 21` : 'Training Hub'}` }),
+      el('h1', { class: 'page-title', text: 'Overview' }),
     ]),
     el('div', { class: 'chip-row' }, [
-      wv.weekNum ? pill(`Week ${wv.weekNum} / 21`, 'cyan') : null,
-      pill(`${hub.ringList.length}d Ring Live`, 'indigo'),
-      pill(`${footRuns(hub).length} Runs`, 'green'),
-      pill(`${hub.sessions.length} Lifts`, 'amber'),
+      race ? el('span', { class: 'muted-xs tabular', text: `${race.days}d to ${race.name}` }) : null,
+      el('button', {
+        type: 'button',
+        class: `chip${state.checkinOpen || activeToggleCount ? ' active' : ''}`,
+        text: activeToggleCount ? `Adjust today (${activeToggleCount})` : 'Adjust today',
+        onClick: () => { state.checkinOpen = !state.checkinOpen; redraw(); },
+      }),
     ]),
   ]));
 
-  // Hero Readiness Card + 3 Radial Rings
+  // Section 1: Whoop / Ultrahuman Hero Ring Triad + Readiness Coach
+  const todaySteps = latestRing.steps ?? 0;
+  const displaySteps = todaySteps < 500 && prevRing.steps ? prevRing.steps : todaySteps;
+  const stepsLabel = todaySteps < 500 && prevRing.steps ? 'Yest. Steps' : 'Steps';
+
   const toggleDefs = [
     { key: 'ankle', label: 'Ankle swollen', danger: true },
     { key: 'period', label: 'Period' },
@@ -71,17 +76,19 @@ export function renderTodayView(hub, state, redraw) {
     { key: 'late', label: 'After 7:30 pm' },
   ];
 
-  const todaySteps = latestRing.steps ?? 0;
-  const displaySteps = todaySteps < 500 && prevRing.steps ? prevRing.steps : todaySteps;
-  const stepsLabel = todaySteps < 500 && prevRing.steps ? 'Yest. Steps' : 'Steps';
+  const heroBriefKids = [
+    el('div', { class: `status-line ${rdy.level}` }, [
+      rdy.level === 'ok' ? '● Ready to Train'
+        : rdy.level === 'stop' ? '● Hard Stop — Ankle'
+          : rdy.level === 'swap' ? '● Consider Swap'
+            : '● Easy / Recovery',
+    ]),
+    el('h2', { class: 'hero-headline', text: rdy.headline }),
+    el('p', { class: 'hero-text', text: rdy.text }),
+  ];
 
-  const hero = el('section', { class: 'card hero-card' }, [
-    el('div', {}, [
-      el('div', { class: `status-badge ${rdy.level}` }, [
-        rdy.level === 'ok' ? '● Ready to Train' : rdy.level === 'stop' ? '● Hard Stop — Ankle' : rdy.level === 'swap' ? '● Consider Swap' : '● Easy / Recovery',
-      ]),
-      el('h2', { class: 'hero-headline', text: rdy.headline }),
-      el('p', { class: 'hero-text', text: rdy.text }),
+  if (state.checkinOpen || activeToggleCount > 0) {
+    heroBriefKids.push(el('div', { class: 'checkin-drawer' }, [
       el('div', { class: 'chip-row' }, toggleDefs.map((t) =>
         el('button', {
           type: 'button',
@@ -90,114 +97,117 @@ export function renderTodayView(hub, state, redraw) {
           onClick: () => { state.toggles[t.key] = !state.toggles[t.key]; redraw(); },
         }),
       )),
-    ]),
+    ]));
+  }
+
+  frag.appendChild(el('section', { class: 'hero-triad' }, [
     el('div', { class: 'hero-rings' }, [
       el('div', { class: 'ring-box' }, [
         radialRing({
-          value: latestRing.recovery, max: 100, size: 104, stroke: 9,
-          color: (latestRing.recovery ?? 0) >= 70 ? '#22c55e' : '#f59e0b',
-          label: 'Recovery Index', sublabel: '/ 100',
+          value: latestRing.recovery, max: 100, size: 118, stroke: 8,
+          color: (latestRing.recovery ?? 0) >= 70 ? '#10d981' : '#f59e0b',
+          label: 'Recovery',
+          displayValue: latestRing.recovery !== null ? `${Math.round(latestRing.recovery)}%` : '—',
+          sublabel: '/ 100',
         }),
         el('span', { class: 'ring-caption', text: 'Recovery' }),
       ]),
       el('div', { class: 'ring-box' }, [
         radialRing({
-          value: latestRing.sleepScore, max: 100, size: 104, stroke: 9,
-          color: '#818cf8', label: 'Sleep Score',
+          value: latestRing.sleepScore, max: 100, size: 118, stroke: 8,
+          color: '#818cf8',
+          label: 'Sleep Score',
+          displayValue: latestRing.sleepScore !== null ? String(Math.round(latestRing.sleepScore)) : '—',
           sublabel: latestRing.sleep ? `${latestRing.sleep.toFixed(1)}h` : '',
         }),
         el('span', { class: 'ring-caption', text: 'Sleep' }),
       ]),
       el('div', { class: 'ring-box' }, [
         radialRing({
-          value: displaySteps, max: sTarget, size: 104, stroke: 9,
-          color: displaySteps >= sTarget ? '#22c55e' : '#38bdf8',
+          value: displaySteps, max: sTarget, size: 118, stroke: 8,
+          color: displaySteps >= sTarget ? '#10d981' : '#38bdf8',
           label: stepsLabel,
           displayValue: displaySteps >= 1000 ? `${(displaySteps / 1000).toFixed(1)}k` : String(displaySteps),
-          sublabel: `/${(sTarget / 1000).toFixed(1)}k`,
+          sublabel: `/ ${(sTarget / 1000).toFixed(1)}k`,
         }),
         el('span', { class: 'ring-caption', text: stepsLabel }),
       ]),
     ]),
-  ]);
-  frag.appendChild(hero);
+    el('div', { class: 'hero-brief' }, heroBriefKids),
+  ]));
 
-  // 6 Live Biometric KPI Cards with 14-day sparklines
+  // Section 2: 4 Core Biometric Strip (Ultrahuman style — restrained, clear deltas)
   const last14 = hub.ringList.slice(-14);
-  frag.appendChild(el('section', { class: 'grid grid-6' }, [
+  const hrvDelta = latestRing.hrv !== null && roll7.roll7Hrv ? latestRing.hrv - roll7.roll7Hrv : null;
+  const rhrDelta = latestRing.rhr !== null && roll7.roll7Rhr ? latestRing.rhr - roll7.roll7Rhr : null;
+  const sleepDelta = latestRing.sleep !== null && roll7.roll7Sleep ? latestRing.sleep - roll7.roll7Sleep : null;
+
+  const deltaEl = (val, unit, lowerIsBetter = false) => {
+    if (val === null) return null;
+    const sign = val > 0 ? '+' : '';
+    const isGood = lowerIsBetter ? val <= 0 : val >= 0;
+    return el('span', {
+      class: `kpi-delta ${Math.abs(val) < 0.2 ? 'neutral' : isGood ? 'good' : 'warn'}`,
+      text: `${sign}${val.toFixed(1)}${unit} vs 7d`,
+    });
+  };
+
+  frag.appendChild(el('section', { class: 'grid grid-4' }, [
     kpiCard({
       label: 'Sleep',
       value: fmt(latestRing.sleep, 2),
       unit: 'h',
-      sub: `7d avg ${fmt(roll7.roll7Sleep, 1)}h • Eff ${latestRing.efficiency ?? '—'}%`,
+      badge: deltaEl(sleepDelta, 'h'),
+      sub: `Deep ${latestRing.deepMin ?? '—'}m · REM ${latestRing.remMin ?? '—'}m · Eff ${latestRing.efficiency ?? '—'}%`,
       spark: last14.map((r) => r.sleep),
       color: '#818cf8',
       target: 8,
     }),
     kpiCard({
-      label: 'Sleep HRV',
+      label: 'HRV',
       value: latestRing.hrv !== null ? Math.round(latestRing.hrv) : '—',
       unit: 'ms',
-      sub: `7d avg ${fmt(roll7.roll7Hrv, 1)} ms • Range ${latestRing.minHrv ?? '—'}–${latestRing.maxHrv ?? '—'}`,
+      badge: deltaEl(hrvDelta, ' ms'),
+      sub: `7d avg ${fmt(roll7.roll7Hrv, 1)} ms · Range ${latestRing.minHrv ?? '—'}–${latestRing.maxHrv ?? '—'}`,
       spark: last14.map((r) => r.hrv),
-      color: '#22c55e',
+      color: '#10d981',
     }),
     kpiCard({
-      label: 'Sleep RHR',
+      label: 'Resting HR',
       value: latestRing.rhr !== null ? Math.round(latestRing.rhr) : '—',
       unit: 'bpm',
-      sub: `7d avg ${fmt(roll7.roll7Rhr, 1)} bpm`,
+      badge: deltaEl(rhrDelta, ' bpm', true),
+      sub: `7d avg ${fmt(roll7.roll7Rhr, 1)} bpm · Sleep min ${latestRing.minHr ?? '—'}`,
       spark: last14.map((r) => r.rhr),
-      color: '#f43f5e',
+      color: '#a1a1aa',
     }),
     kpiCard({
-      label: 'Deep + REM',
-      value: latestRing.deepMin !== null && latestRing.remMin !== null ? `${latestRing.deepMin + latestRing.remMin}` : '—',
-      unit: 'min',
-      sub: `Deep ${latestRing.deepMin ?? '—'}m • REM ${latestRing.remMin ?? '—'}m`,
-      spark: last14.map((r) => (r.deepMin || 0) + (r.remMin || 0)),
-      color: '#a855f7',
-    }),
-    kpiCard({
-      label: 'Skin Temp',
+      label: 'Temp & VO2',
       value: fmt(latestRing.skinTemp, 2),
       unit: '°C',
-      sub: `Movement ${latestRing.movement ?? '—'}/100`,
+      badge: latestRing.vo2Max ? el('span', { class: 'kpi-delta neutral', text: `VO2 ${fmt(latestRing.vo2Max, 0)}` }) : null,
+      sub: `Movement ${latestRing.movement ?? '—'}/100 · ${latestRing.bedtime || '—'} → ${latestRing.wakeTime || '—'}`,
       spark: last14.map((r) => r.skinTemp),
       color: '#38bdf8',
     }),
-    kpiCard({
-      label: 'VO2 Max',
-      value: latestRing.vo2Max !== null ? fmt(latestRing.vo2Max, 1) : '—',
-      unit: '',
-      sub: `Bed ${latestRing.bedtime || '—'} → ${latestRing.wakeTime || '—'}`,
-      spark: last14.map((r) => r.vo2Max),
-      color: '#f59e0b',
-    }),
   ]));
 
-  // Week Strip Card
-  frag.appendChild(el('section', { class: 'card', style: { marginBottom: '16px' } }, [
-    el('div', { class: 'card-head' }, [
-      el('h3', { class: 'card-title' }, [
-        `This Week`,
-        wv.weekNum ? pill(`Runna W${wv.weekNum}`, 'cyan') : null,
-      ]),
-      el('div', { class: 'chip-row' }, [
-        pill(`Run ${wv.runKm} / ${wv.weekKm ?? '—'} km`, wv.weekKm && wv.runKm >= wv.weekKm ? 'green' : 'cyan'),
-        pill(`Gym ${wv.gymDone} / ${wv.gymPlanned}`, wv.gymDone >= wv.gymPlanned ? 'green' : 'amber'),
-      ]),
+  // Section 3: Minimalist Week Rail
+  frag.appendChild(el('section', { class: 'card', style: { marginBottom: '16px', padding: '18px 22px' } }, [
+    el('div', { class: 'card-head', style: { marginBottom: '12px' } }, [
+      el('h3', { class: 'card-title', text: wv.weekNum ? `This Week · Runna W${wv.weekNum}` : 'This Week' }),
+      el('div', { class: 'muted-xs tabular', text: `Runs ${wv.runKm} / ${wv.weekKm ?? '—'} km   ·   Gym ${wv.gymDone} / ${wv.gymPlanned}` }),
     ]),
     el('div', { class: 'week-strip' }, wv.days.map((d) => {
       const planLbl = d.planned.type === 'run'
         ? (d.planned.km ? `${d.planned.km} km` : 'Run')
-        : d.planned.session.replace('Upper ', 'Up ').replace('Lower', 'Lower');
-      const subLbl = d.actualKm > 0 ? `${d.actualKm} km ✓`
-        : d.gymTitle ? 'Gym ✓'
+        : d.planned.session.replace('Upper ', 'Up ');
+      const subLbl = d.actualKm > 0 ? `${d.actualKm} km`
+        : d.gymTitle ? 'Done'
           : d.steps !== null ? `${(d.steps / 1000).toFixed(1)}k` : '—';
       return el('button', {
         type: 'button',
-        class: `day-tile${d.isToday ? ' today' : ''}${d.date === selectedDay ? ' selected' : ''}${d.done === 'workout' ? ' done' : ''}`,
+        class: `day-tile${d.isToday ? ' today' : ''}${d.date === selectedDay ? ' selected' : ''}`,
         onClick: () => { state.selectedDay = d.date; redraw(); },
       }, [
         el('div', { class: 'day-name', text: d.name }),
@@ -208,14 +218,10 @@ export function renderTodayView(hub, state, redraw) {
     })),
   ]));
 
-  // Bottom 2-column Bento: Left = Selected Day Prescription, Right = Races + Recent Wins
+  // Section 4: Clean 2-Column Editorial Split (Zero Nested Boxes)
   const rxCard = buildPrescriptionCard(hub, selectedDay, planDay, state, redraw);
-  const rightCol = el('div', { style: { display: 'grid', gap: '16px', alignContent: 'start' } }, [
-    buildRacesCard(hub, today),
-    buildWinsCard(hub, today),
-  ]);
-
-  frag.appendChild(el('section', { class: 'grid grid-7-5' }, [rxCard, rightCol]));
+  const rightCard = buildMilestonesAndWinsCard(hub, today);
+  frag.appendChild(el('section', { class: 'grid grid-7-5' }, [rxCard, rightCard]));
   return frag;
 }
 
@@ -224,68 +230,71 @@ function buildPrescriptionCard(hub, day, planDay, state, redraw) {
   const z2Hi = zone2Max(hub);
   const card = el('div', { class: 'card' });
 
-  const headerTitle = day === state.today
-    ? `Today’s Plan • ${planDay.session}`
-    : `${prettyDate(day, true)} • ${planDay.session}`;
-
-  const badges = [];
-  if (planDay.type === 'run' && planDay.km) badges.push(pill(`${planDay.km} km`, 'cyan'));
-  else if (planDay.type === 'gym') badges.push(pill('Strength', 'amber'));
-  else badges.push(pill('Recovery', 'green'));
-
-  card.appendChild(el('div', { class: 'card-head' }, [
-    el('h3', { class: 'card-title', text: headerTitle }),
-    el('div', { class: 'chip-row' }, badges),
+  const kicker = day === state.today ? 'Today’s Session' : prettyDate(day, true);
+  card.appendChild(el('div', { class: 'card-head', style: { marginBottom: '6px' } }, [
+    el('h3', { class: 'card-title', text: kicker }),
+    el('span', { class: 'muted-xs', text: planDay.type === 'run' ? 'Zone 2 Aerobic' : planDay.type === 'gym' ? 'Strength Block' : 'Active Recovery' }),
   ]));
 
-  // Override banners from active toggles
+  const titleText = planDay.type === 'run' && planDay.km
+    ? `${planDay.session} — ${planDay.km} km`
+    : planDay.session;
+  card.appendChild(el('h2', { class: 'session-hero-title', text: titleText }));
+
+  // Active toggle coaching callout
   if (state.toggles.ankle && planDay.type === 'run') {
-    card.appendChild(el('div', { class: 'detail-panel', style: { borderLeft: '3px solid var(--rose)', marginBottom: '12px' } }, [
-      el('strong', { text: 'Ankle Swelling Protocol (Hard Stop)' }),
-      el('span', { text: 'Skip running today. Swap for gentle mobility, upper-body work, or rest until swelling completely settles.' }),
+    card.appendChild(el('div', { class: 'detail-panel', style: { borderLeft: '2px solid var(--rose)', marginBottom: '14px' } }, [
+      el('strong', { text: 'Ankle Protocol — Skip Running' }),
+      el('span', { text: 'Hard stop on running while swollen. Swap for gentle mobility, upper-body work, or rest.' }),
     ]));
   } else if (state.toggles.late) {
-    card.appendChild(el('div', { class: 'detail-panel', style: { borderLeft: '3px solid var(--amber)', marginBottom: '12px' } }, [
-      el('strong', { text: '8:00 pm Sleep-Protection Cutoff' }),
-      el('span', { text: 'Keep movement light (walk or 15-min mobility) so heart rate settles before bed.' }),
+    card.appendChild(el('div', { class: 'detail-panel', style: { borderLeft: '2px solid var(--amber)', marginBottom: '14px' } }, [
+      el('strong', { text: 'After 8:00 pm Cutoff' }),
+      el('span', { text: 'Keep movement light (easy walk or 15-min mobility) to protect tonight’s sleep.' }),
     ]));
   } else if (state.toggles.short || state.toggles.low) {
-    card.appendChild(el('div', { class: 'detail-panel', style: { borderLeft: '3px solid var(--cyan)', marginBottom: '12px' } }, [
-      el('strong', { text: state.toggles.short ? 'Express 25-Min Version' : 'Low-Energy Floor' }),
+    card.appendChild(el('div', { class: 'detail-panel', style: { borderLeft: '2px solid var(--cyan)', marginBottom: '14px' } }, [
+      el('strong', { text: state.toggles.short ? 'Express 25-Min Option' : 'Low-Energy Floor' }),
       el('span', {
         text: planDay.type === 'run'
-          ? 'Do 20 min easy run/walk strictly under 163 bpm — consistency beats volume.'
+          ? '20 min easy run/walk strictly under 163 bpm — consistency beats volume.'
           : 'Hit the first 3 compound lifts (2 working sets each) and call it a win.',
       }),
     ]));
   }
 
   if (planDay.type === 'run') {
-    card.appendChild(el('div', { class: 'detail-panel', style: { marginBottom: '12px' } }, [
-      el('div', { class: 'detail-grid' }, [
-        el('div', { class: 'detail-kv' }, [el('span', { class: 'detail-k', text: 'Runna Distance' }), el('span', { class: 'detail-v', text: planDay.km ? `${planDay.km} km` : 'Easy' })]),
-        el('div', { class: 'detail-kv' }, [el('span', { class: 'detail-k', text: 'Zone 2 Target' }), el('span', { class: 'detail-v', text: `${z2Lo}–${z2Hi} bpm` })]),
-        el('div', { class: 'detail-kv' }, [el('span', { class: 'detail-k', text: 'Rule' }), el('span', { class: 'detail-v', text: 'Distance only — no speed work; walk breaks if HR > 163' })]),
-      ]),
+    card.appendChild(el('div', { class: 'spec-row' }, [
+      el('div', { class: 'spec-item' }, [el('span', { class: 'spec-k', text: 'Distance' }), el('span', { class: 'spec-v tabular', text: planDay.km ? `${planDay.km} km` : 'Easy' })]),
+      el('div', { class: 'spec-item' }, [el('span', { class: 'spec-k', text: 'Heart Rate Cap' }), el('span', { class: 'spec-v tabular', text: `${z2Lo}–${z2Hi} bpm` })]),
+      el('div', { class: 'spec-item' }, [el('span', { class: 'spec-k', text: 'Execution' }), el('span', { class: 'spec-v', text: 'Easy pace · walk breaks if > 163' })]),
     ]));
 
     const pre = hub.plan.warmup.pre_run || [];
+    const actions = [];
     if (pre.length) {
-      card.appendChild(el('div', { class: 'card-sub', text: 'Pre-Run Warmup', style: { fontWeight: 700, marginBottom: '8px' } }));
-      pre.forEach((w) => {
-        card.appendChild(el('div', { class: 'ex-item' }, [
-          el('div', { class: 'ex-head' }, [
-            el('div', {}, [el('div', { class: 'ex-name', text: w.move }), el('div', { class: 'ex-dose', text: w.cue })]),
-            pill(w.dose, 'cyan'),
-          ]),
-        ]));
-      });
+      actions.push(el('button', {
+        type: 'button',
+        class: 'drawer-btn',
+        text: state.warmupOpen ? `Hide Pre-Run Warmup (${pre.length})` : `Pre-Run Warmup (${pre.length} moves)`,
+        onClick: () => { state.warmupOpen = !state.warmupOpen; redraw(); },
+      }));
     }
-    const runLink = safeExternalLink(hub.plan.link.run_cards, 'Open Run Swipe Cards ↗');
-    if (runLink) card.appendChild(el('div', { style: { marginTop: '10px' } }, [runLink]));
+    const runLink = safeExternalLink(hub.plan.link.run_cards, 'Swipe Cards ↗');
+    if (runLink) actions.push(runLink);
+    card.appendChild(el('div', { class: 'chip-row' }, actions));
+
+    if (state.warmupOpen && pre.length) {
+      card.appendChild(el('div', { class: 'hairline-list', style: { marginTop: '12px' } }, pre.map((w) =>
+        el('div', { class: 'hairline-row' }, [
+          el('div', {}, [el('div', { class: 'row-title', text: w.move }), el('div', { class: 'row-sub', text: w.cue })]),
+          el('div', { class: 'row-right', text: w.dose }),
+        ]),
+      )));
+    }
   } else if (planDay.type === 'gym') {
     const list = hub.plan.exercises[planDay.session] || [];
-    list.forEach((ex) => {
+    card.appendChild(el('div', { class: 'hairline-list' }, list.map((ex) => {
       const last = lastLoggedFor(hub, ex, day);
       const expKey = `rx:${ex.name}`;
       const isOpen = !!state.expanded[expKey];
@@ -298,9 +307,7 @@ function buildPrescriptionCard(hub, day, planDay, state, redraw) {
             el('div', { class: 'ex-name', text: `${ex.order}. ${ex.name}` }),
             el('div', { class: 'ex-dose', text: ex.dose }),
           ]),
-          el('div', { class: 'chip-row' }, [
-            last ? pill(`Last: ${formatSet(last.top)}`, last.inverted ? 'green' : 'amber') : pill('New', 'muted'),
-          ]),
+          el('span', { class: 'row-right', text: last ? formatSet(last.top) : 'New' }),
         ]),
       ]);
       if (isOpen) {
@@ -310,13 +317,13 @@ function buildPrescriptionCard(hub, day, planDay, state, redraw) {
           ex.watch ? el('div', {}, [el('strong', { text: 'Watch out: ' }), ex.watch]) : null,
         ]));
       }
-      card.appendChild(item);
-    });
-    const gymLink = safeExternalLink(hub.plan.link.gym_cards, 'Open Gym Swipe Cards ↗');
-    if (gymLink) card.appendChild(el('div', { style: { marginTop: '10px' } }, [gymLink]));
+      return item;
+    })));
+    const gymLink = safeExternalLink(hub.plan.link.gym_cards, 'Gym Swipe Cards ↗');
+    if (gymLink) card.appendChild(el('div', { style: { marginTop: '14px' } }, [gymLink]));
   } else {
     card.appendChild(el('p', {
-      class: 'card-sub',
+      class: 'hero-text',
       text: 'Rest day — hit your 7,500+ step floor with easy walks, hydrate, prioritize protein, and aim for 8 h of sleep.',
     }));
   }
@@ -324,38 +331,33 @@ function buildPrescriptionCard(hub, day, planDay, state, redraw) {
   return card;
 }
 
-function buildRacesCard(hub, today) {
+function buildMilestonesAndWinsCard(hub, today) {
   const races = allRaces(hub, today);
-  return el('div', { class: 'card' }, [
-    el('div', { class: 'card-head' }, [
-      el('h3', { class: 'card-title' }, [icon('trophy', 16), 'Race Countdowns']),
-      pill(`${races.length} Goals`, 'cyan'),
-    ]),
-    ...races.map((r) => el('div', { class: 'race-row' }, [
-      el('div', {}, [
-        el('div', { class: 'win-title', text: `${r.name} • ${r.distance}` }),
-        el('div', { class: 'win-detail', text: `${prettyDate(r.date, false)} • Week ${r.week}${r.note ? ' • ' + r.note : ''}` }),
-      ]),
-      pill(r.days >= 0 ? `${r.days}d left` : 'Completed', r.days <= 30 && r.days >= 0 ? 'amber' : 'cyan'),
-    ])),
-  ]);
-}
+  const wins = recentWins(hub, today).slice(0, 3);
 
-function buildWinsCard(hub, today) {
-  const wins = recentWins(hub, today);
   return el('div', { class: 'card' }, [
-    el('div', { class: 'card-head' }, [
-      el('h3', { class: 'card-title' }, [icon('flame', 16), 'Recent Wins (14d)']),
+    el('div', { class: 'card-head', style: { marginBottom: '6px' } }, [
+      el('h3', { class: 'card-title', text: 'Upcoming Races' }),
     ]),
-    ...(wins.length
-      ? wins.map((w) => el('div', { class: 'win-item' }, [
-        pill(w.type.toUpperCase(), w.type === 'lift' ? 'amber' : w.type === 'run' ? 'green' : 'cyan'),
+    el('div', { class: 'hairline-list' }, races.map((r) => el('div', { class: 'hairline-row' }, [
+      el('div', {}, [
+        el('div', { class: 'row-title', text: `${r.name}` }),
+        el('div', { class: 'row-sub', text: `${r.distance} · ${prettyDate(r.date, false)} · Week ${r.week}` }),
+      ]),
+      el('div', { class: 'row-right', text: r.days >= 0 ? `${r.days}d` : 'Done' }),
+    ]))),
+    el('div', { class: 'section-divider' }),
+    el('div', { class: 'card-head', style: { marginBottom: '6px' } }, [
+      el('h3', { class: 'card-title', text: 'Recent Momentum' }),
+    ]),
+    el('div', { class: 'hairline-list' }, wins.length
+      ? wins.map((w) => el('div', { class: 'hairline-row' }, [
         el('div', {}, [
-          el('div', { class: 'win-title', text: w.title }),
-          el('div', { class: 'win-detail', text: w.detail }),
+          el('div', { class: 'row-title', text: w.title }),
+          el('div', { class: 'row-sub', text: w.detail }),
         ]),
       ]))
-      : [el('p', { class: 'card-sub', text: 'Keep stacking sessions — your next PR or Zone 2 run will highlight here.' })]),
+      : [el('p', { class: 'card-sub', text: 'Your next PR or Zone 2 milestone will appear here.' })]),
   ]);
 }
 

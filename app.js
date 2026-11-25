@@ -17,6 +17,8 @@ const state = {
   today: todayIST(),
   selectedDay: todayIST(),
   toggles: { ankle: false, period: false, low: false, short: false, late: false },
+  checkinOpen: false,
+  warmupOpen: false,
   expanded: {},
   runFilter: 'Run',
   ringRange: 30,

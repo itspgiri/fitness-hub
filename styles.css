@@ -1,16 +1,80 @@
-:root { color-scheme: dark; }
+:root {
+  color-scheme: dark;
+  --bg: #0f172a; --card: #1e293b; --line: #334155; --text: #e2e8f0; --muted: #94a3b8;
+  --green: #34d399; --amber: #fbbf24; --blue: #60a5fa;
+}
+* { box-sizing: border-box; }
 body {
-  margin: 0; background: #0f172a; color: #e2e8f0;
+  margin: 0; background: var(--bg); color: var(--text);
   font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
-main { max-width: 26rem; margin: 0 auto; padding: 2.5rem 1.25rem; }
-h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
-.muted { color: #94a3b8; font-size: 0.875rem; margin: 0 0 1.5rem; }
-button {
-  width: 100%; padding: 0.875rem 1rem; margin-bottom: 0.75rem;
-  border: 0; border-radius: 0.75rem; font: inherit; font-weight: 600;
-  background: #10b981; color: #052e2b;
+main { max-width: 30rem; margin: 0 auto; padding: 1rem 1rem 3rem; }
+h1 { font-size: 1.6rem; margin: 0.5rem 0 0.25rem; }
+h2 { font-size: 1.15rem; margin: 0 0 0.5rem; }
+h3 { font-size: 1rem; margin: 0 0 0.15rem; }
+p { margin: 0 0 0.5rem; }
+a, .link { color: var(--blue); }
+.muted, .sub, .hint, .dose { color: var(--muted); }
+.sub { font-size: 0.9rem; margin-bottom: 0.15rem; }
+.hint { font-size: 0.8rem; margin-top: 0.5rem; }
+.warn { color: var(--amber); }
+.banner {
+  font-size: 0.8rem; color: var(--muted); border: 1px dashed var(--line);
+  border-radius: 0.5rem; padding: 0.4rem 0.6rem;
 }
-button:disabled { opacity: 0.5; }
+.top { margin-bottom: 1rem; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 0.9rem;
+  padding: 1rem; margin-bottom: 0.9rem;
+}
+.note {
+  border-left: 3px solid var(--amber); padding-left: 0.6rem; color: var(--amber);
+}
+.done {
+  border-left: 3px solid var(--green); padding-left: 0.6rem; margin-bottom: 0.9rem;
+}
+.done-title { font-weight: 600; color: var(--green); }
+.exercise { border-top: 1px solid var(--line); padding-top: 0.75rem; margin-top: 0.75rem; }
+.exercise p { font-size: 0.92rem; margin-bottom: 0.3rem; }
+.last { color: var(--green); }
+details { margin: 0.5rem 0; }
+summary { cursor: pointer; color: var(--blue); padding: 0.25rem 0; }
+.checks { list-style: none; margin: 0.4rem 0 0; padding: 0; }
+.checks li { margin-bottom: 0.6rem; }
+.checks label { display: flex; gap: 0.6rem; align-items: flex-start; }
+.checks input { width: 1.2rem; height: 1.2rem; margin-top: 0.2rem; flex: none; }
+.cue { display: block; color: var(--muted); font-size: 0.88rem; }
+.ready.ok { border-color: var(--green); }
+.ready.easy, .ready.swap { border-color: var(--amber); }
+.ready p { margin: 0; }
+.toggles { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.9rem; }
+button { font: inherit; color: inherit; }
+.chip {
+  background: transparent; border: 1px solid var(--line); border-radius: 999px;
+  padding: 0.45rem 0.85rem; font-size: 0.9rem;
+}
+.chip.on { background: var(--amber); border-color: var(--amber); color: #1f1300; font-weight: 600; }
+.week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.3rem; margin-bottom: 0.6rem; }
+.day {
+  background: transparent; border: 1px solid var(--line); border-radius: 0.6rem;
+  padding: 0.35rem 0; display: flex; flex-direction: column; align-items: center; min-height: 4.4rem;
+}
+.day .dn { font-size: 0.75rem; color: var(--muted); }
+.day .dl { font-size: 1.1rem; font-weight: 600; }
+.day .dm { font-size: 0.7rem; color: var(--green); min-height: 1rem; }
+.day.is-today { border-color: var(--blue); }
+.day.is-view { background: #0b1220; }
+.day.is-done { border-color: var(--green); }
+.preview { color: var(--amber); }
+.link { background: none; border: 0; padding: 0; text-decoration: underline; }
+.win { border-color: var(--green); }
+.win p { margin: 0; }
+
+/* sign-in test page */
+#signin, #signout {
+  width: 100%; padding: 0.875rem 1rem; margin-bottom: 0.75rem; border: 0;
+  border-radius: 0.75rem; font-weight: 600; background: #10b981; color: #052e2b;
+}
+#signin:disabled { opacity: 0.5; }
 #signout { background: #1e293b; color: #e2e8f0; }
 .result { font-size: 1.125rem; font-weight: 600; overflow-wrap: anywhere; }

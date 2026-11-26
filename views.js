@@ -262,10 +262,31 @@ export function renderTodayView(hub, state, redraw) {
   ]));
 
   // Section 3: Minimalist Week Rail
+  const gymSegs = [];
+  for (let i = 0; i < Math.max(1, wv.gymPlanned); i++) {
+    gymSegs.push(el('span', { class: `seg-dot${i < wv.gymDone ? ' filled' : ''}` }));
+  }
+
   frag.appendChild(el('section', { class: 'card', style: { marginBottom: '16px', padding: '18px 22px' } }, [
-    el('div', { class: 'card-head', style: { marginBottom: '12px' } }, [
+    el('div', { class: 'card-head', style: { marginBottom: '14px' } }, [
       el('h3', { class: 'card-title', text: wv.weekNum ? `This Week · Runna W${wv.weekNum}` : 'This Week' }),
-      el('div', { class: 'muted-xs tabular', text: `Runs ${wv.runKm} / ${wv.weekKm ?? '—'} km   ·   Gym ${wv.gymDone} / ${wv.gymPlanned}` }),
+      el('div', { class: 'week-metrics' }, [
+        el('div', { class: 'week-metric' }, [
+          el('span', { class: 'week-metric-lbl', text: 'Runs' }),
+          el('span', { class: 'week-metric-val', text: `${wv.runKm} / ${wv.weekKm ?? '—'} km` }),
+          el('span', { class: 'week-metric-bar' }, [
+            el('span', {
+              class: `week-metric-fill${runPct >= 100 ? ' done' : ''}`,
+              style: { width: `${Math.max(wv.runKm > 0 ? 8 : 0, Math.min(100, runPct)).toFixed(0)}%` },
+            }),
+          ]),
+        ]),
+        el('div', { class: 'week-metric' }, [
+          el('span', { class: 'week-metric-lbl', text: 'Gym' }),
+          el('span', { class: 'week-metric-val', text: `${wv.gymDone} / ${wv.gymPlanned}` }),
+          el('span', { class: 'seg-dots' }, gymSegs),
+        ]),
+      ]),
     ]),
     el('div', { class: 'week-strip' }, wv.days.map((d) => {
       const planLbl = d.planned.type === 'run'

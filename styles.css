@@ -40,18 +40,27 @@
   --bg-elev: #ffffff;
   --bg-card: #ffffff;
   --bg-card-solid: #ffffff;
-  --bg-card-hover: #fafafa;
-  --bg-subtle: rgba(0, 0, 0, 0.03);
-  --bg-pill: rgba(0, 0, 0, 0.055);
+  --bg-card-hover: #f9fafb;
+  --bg-subtle: #f4f4f5;
+  --bg-pill: #eceef2;
   --text: #09090b;
   --text-soft: #3f3f46;
   --muted: #71717a;
-  --border: rgba(0, 0, 0, 0.07);
-  --border-strong: rgba(0, 0, 0, 0.16);
-  --grid-line: rgba(0, 0, 0, 0.06);
-  --ring-track: rgba(0, 0, 0, 0.08);
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --border: rgba(9, 9, 11, 0.08);
+  --border-strong: rgba(9, 9, 11, 0.18);
+  --grid-line: rgba(9, 9, 11, 0.06);
+  --ring-track: #eceef2;
+  --shadow: 0 1px 2px rgba(9, 9, 11, 0.04), 0 4px 16px rgba(9, 9, 11, 0.03);
   --green: #059669;
+  --green-soft: rgba(5, 150, 105, 0.11);
+  --cyan: #0284c7;
+  --cyan-soft: rgba(2, 132, 199, 0.10);
+  --indigo: #4f46e5;
+  --indigo-soft: rgba(79, 70, 229, 0.10);
+  --amber: #d97706;
+  --amber-soft: rgba(217, 119, 6, 0.11);
+  --rose: #e11d48;
+  --rose-soft: rgba(225, 29, 72, 0.10);
 }
 
 * { box-sizing: border-box; }
@@ -303,6 +312,83 @@ body {
 }
 
 .card-sub { font-size: 12px; color: var(--muted); }
+
+/* ---- Front Athlete Status Bar -------------------------------------------- */
+
+.status-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.status-cell {
+  padding: 15px 18px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.status-cell:last-child { border-right: none; }
+
+.status-cell-k {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+}
+
+.status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.ok { background: var(--green); }
+.status-dot.warn { background: var(--amber); }
+.status-dot.stop { background: var(--rose); }
+.status-dot.info { background: var(--cyan); }
+
+.status-cell-v {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status-cell-sub {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mini-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ring-track);
+  overflow: hidden;
+  margin-top: 3px;
+}
+
+.mini-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
 
 /* ---- Pro Athlete Hero (Whoop / Ultrahuman Triad) ------------------------- */
 
@@ -737,6 +823,10 @@ select.select-input {
 /* ---- Responsive (Tablet & iPhone) ---------------------------------------- */
 
 @media (max-width: 1120px) {
+  .status-bar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status-cell { border-bottom: 1px solid var(--border); }
+  .status-cell:nth-child(2n) { border-right: none; }
+  .status-cell:last-child { grid-column: 1 / -1; border-bottom: none; border-right: none; }
   .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .hero-triad { grid-template-columns: 1fr; gap: 22px; }
   .hero-brief { border-left: none; padding-left: 0; border-top: 1px solid var(--border); padding-top: 18px; }

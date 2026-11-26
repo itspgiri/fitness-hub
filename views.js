@@ -63,6 +63,75 @@ export function renderTodayView(hub, state, redraw) {
     ]),
   ]));
 
+  // Front Current Status Bar (at-a-glance athlete posture)
+  const runsList = footRuns(hub);
+  const lastRun = runsList[0] || null;
+  const sleepPct = latestRing.sleep ? Math.min(100, (latestRing.sleep / 8) * 100) : 0;
+  const runPct = wv.weekKm ? Math.min(100, (wv.runKm / wv.weekKm) * 100) : 0;
+  const gymPct = wv.gymPlanned ? Math.min(100, (wv.gymDone / wv.gymPlanned) * 100) : 0;
+  const recVal = latestRing.recovery ?? 0;
+  const statusLabel = rdy.level === 'stop' ? 'Ankle Stop'
+    : rdy.level === 'ok' ? 'Green Light'
+      : rdy.level === 'swap' ? 'Swap / Easy'
+        : 'Easy / Pace';
+  const statusTone = rdy.level === 'stop' ? 'stop' : rdy.level === 'ok' ? 'ok' : 'warn';
+  const statusColor = statusTone === 'ok' ? 'var(--green)' : statusTone === 'stop' ? 'var(--rose)' : 'var(--amber)';
+
+  const statusCell = ({ k, v, sub, pct, color, dot }) => el('div', { class: 'status-cell' }, [
+    el('div', { class: 'status-cell-k' }, [
+      el('span', { text: k }),
+      el('span', { class: `status-dot ${dot}` }),
+    ]),
+    el('div', { class: 'status-cell-v', text: v }),
+    el('div', { class: 'status-cell-sub', text: sub }),
+    el('div', { class: 'mini-bar' }, [
+      el('div', { class: 'mini-bar-fill', style: { width: `${Math.max(4, Math.min(100, pct)).toFixed(0)}%`, background: color } }),
+    ]),
+  ]);
+
+  frag.appendChild(el('section', { class: 'status-bar' }, [
+    statusCell({
+      k: 'Current Status',
+      v: statusLabel,
+      sub: recVal ? `Recovery ${Math.round(recVal)}/100 · ${planDay.session}` : planDay.session,
+      pct: recVal || 50,
+      color: statusColor,
+      dot: statusTone,
+    }),
+    statusCell({
+      k: 'Sleep Target',
+      v: latestRing.sleep ? `${latestRing.sleep.toFixed(2)} / 8.0h` : '—',
+      sub: `Score ${latestRing.sleepScore ?? '—'} · Eff ${latestRing.efficiency ?? '—'}%`,
+      pct: sleepPct,
+      color: sleepPct >= 95 ? 'var(--green)' : 'var(--indigo)',
+      dot: sleepPct >= 95 ? 'ok' : 'info',
+    }),
+    statusCell({
+      k: `Week ${wv.weekNum ?? ''} Runs`,
+      v: `${wv.runKm} / ${wv.weekKm ?? '—'} km`,
+      sub: wv.runsLeft > 0 ? `${wv.runsLeft} run${wv.runsLeft === 1 ? '' : 's'} left this week` : 'Weekly run goal hit',
+      pct: runPct,
+      color: runPct >= 100 ? 'var(--green)' : 'var(--cyan)',
+      dot: runPct >= 100 ? 'ok' : 'info',
+    }),
+    statusCell({
+      k: 'Week Strength',
+      v: `${wv.gymDone} / ${wv.gymPlanned} sessions`,
+      sub: wv.gymLeft > 0 ? `${wv.gymLeft} lift${wv.gymLeft === 1 ? '' : 's'} remaining` : 'Weekly strength hit',
+      pct: gymPct,
+      color: gymPct >= 100 ? 'var(--green)' : 'var(--amber)',
+      dot: gymPct >= 100 ? 'ok' : 'warn',
+    }),
+    statusCell({
+      k: 'Aerobic Cap',
+      v: lastRun && lastRun.avgHr ? `${Math.round(lastRun.avgHr)} bpm last` : `≤ ${z2Hi} bpm`,
+      sub: lastRun ? `${lastRun.km} km on ${prettyDate(lastRun.date, false)} · Z2 ≤ ${z2Hi}` : `Zone 2 ${z2Lo}–${z2Hi} bpm`,
+      pct: lastRun && lastRun.avgHr ? Math.min(100, (z2Hi / lastRun.avgHr) * 100) : 70,
+      color: lastRun && lastRun.avgHr && lastRun.avgHr <= z2Hi ? 'var(--green)' : 'var(--amber)',
+      dot: lastRun && lastRun.avgHr && lastRun.avgHr <= z2Hi ? 'ok' : 'warn',
+    }),
+  ]));
+
   // Section 1: Whoop / Ultrahuman Hero Ring Triad + Readiness Coach
   const todaySteps = latestRing.steps ?? 0;
   const displaySteps = todaySteps < 500 && prevRing.steps ? prevRing.steps : todaySteps;

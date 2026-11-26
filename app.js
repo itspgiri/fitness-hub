@@ -13,7 +13,7 @@ const root = document.getElementById('app');
 
 const state = {
   tab: 'today',
-  theme: 'dark',
+  theme: 'light',
   today: todayIST(),
   selectedDay: todayIST(),
   toggles: { ankle: false, period: false, low: false, short: false, late: false },

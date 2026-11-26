@@ -30,6 +30,7 @@ export function icon(name, size = 18) {
     trophy: [['M8 21h8', 'M12 17v4', 'M7 4h10v5a5 5 0 0 1-10 0V4z', 'M7 6H4v2a3 3 0 0 0 3 3', 'M17 6h3v2a3 3 0 0 1-3 3']],
     check: [['M20 6L9 17l-5-5']],
     chevron: [['M6 9l6 6 6-6']],
+    refresh: [['M21 12a9 9 0 1 1-2.64-6.36', 'M21 3v6h-6']],
     pulse: [['M2 12h4l3-7 4 14 3-7h6']],
   };
   const def = paths[name] || paths.pulse;

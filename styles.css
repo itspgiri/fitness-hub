@@ -221,6 +221,19 @@ body {
   cursor: pointer;
 }
 .icon-btn:hover { border-color: var(--border-strong); color: var(--text); }
+.icon-btn:disabled { opacity: 0.6; cursor: wait; }
+.icon-btn.spinning .ico { animation: spin 0.9s linear infinite; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.foot-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 
 .mobile-bar { display: none; }
 .mobile-nav { display: none; }

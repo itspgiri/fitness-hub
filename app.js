@@ -24,9 +24,48 @@ const state = {
   ringRange: 30,
   selectedExercise: null,
   strengthTab: 'history',
+  refreshing: false,
+  refreshNote: '',
 };
 
 let hub = null;
+
+async function fetchSnapshot() {
+  const res = await fetch(`local-data/snapshot.json?t=${Date.now()}`, { cache: 'no-store' });
+  if (!res.ok) throw new Error('Snapshot not found');
+  const snap = await res.json();
+  hub = buildHub(snap);
+  state.today = todayIST();
+}
+
+async function handleRefresh() {
+  if (state.refreshing) return;
+  state.refreshing = true;
+  state.refreshNote = 'Syncing Sheet…';
+  render();
+  try {
+    const resp = await fetch('/api/refresh', {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'fitness-hub' },
+    });
+    if (!resp.ok && resp.status !== 404 && resp.status !== 405 && resp.status !== 501) {
+      throw new Error('Refresh failed');
+    }
+    await fetchSnapshot();
+    state.refreshNote = 'Updated just now';
+  } catch {
+    state.refreshNote = 'Refresh failed';
+  } finally {
+    state.refreshing = false;
+    render();
+    setTimeout(() => {
+      if (!state.refreshing && state.refreshNote) {
+        state.refreshNote = '';
+        render();
+      }
+    }, 3500);
+  }
+}
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', state.theme);
@@ -84,15 +123,25 @@ function render() {
     el('div', { class: 'sidebar-foot' }, [
       el('div', { class: 'sync-pill' }, [
         el('span', { class: `sync-dot${fresh.stale ? ' stale' : ''}` }),
-        el('span', { text: fresh.label }),
+        el('span', { text: state.refreshNote || fresh.label }),
       ]),
-      el('button', {
-        type: 'button',
-        class: 'icon-btn',
-        title: `Switch to ${state.theme === 'dark' ? 'light' : 'dark'} theme`,
-        'aria-label': 'Toggle theme',
-        onClick: toggleTheme,
-      }, [icon(state.theme === 'dark' ? 'sun' : 'moon', 16)]),
+      el('div', { class: 'foot-actions' }, [
+        el('button', {
+          type: 'button',
+          class: `icon-btn${state.refreshing ? ' spinning' : ''}`,
+          title: 'Fetch latest data from Google Sheet',
+          'aria-label': 'Refresh data',
+          disabled: state.refreshing ? 'disabled' : null,
+          onClick: handleRefresh,
+        }, [icon('refresh', 15)]),
+        el('button', {
+          type: 'button',
+          class: 'icon-btn',
+          title: `Switch to ${state.theme === 'dark' ? 'light' : 'dark'} theme`,
+          'aria-label': 'Toggle theme',
+          onClick: toggleTheme,
+        }, [icon(state.theme === 'dark' ? 'sun' : 'moon', 15)]),
+      ]),
     ]),
   ]);
 
@@ -102,15 +151,24 @@ function render() {
       el('div', { class: 'brand-mark', style: { width: '30px', height: '30px', fontSize: '12px' }, text: 'PG' }),
       el('div', {}, [
         el('div', { class: 'brand-title', style: { fontSize: '14px' }, text: 'Fitness Hub' }),
-        el('div', { class: 'brand-sub', text: fresh.label }),
+        el('div', { class: 'brand-sub', text: state.refreshNote || fresh.label }),
       ]),
     ]),
-    el('button', {
-      type: 'button',
-      class: 'icon-btn',
-      'aria-label': 'Toggle theme',
-      onClick: toggleTheme,
-    }, [icon(state.theme === 'dark' ? 'sun' : 'moon', 16)]),
+    el('div', { class: 'foot-actions' }, [
+      el('button', {
+        type: 'button',
+        class: `icon-btn${state.refreshing ? ' spinning' : ''}`,
+        'aria-label': 'Refresh data',
+        disabled: state.refreshing ? 'disabled' : null,
+        onClick: handleRefresh,
+      }, [icon('refresh', 15)]),
+      el('button', {
+        type: 'button',
+        class: 'icon-btn',
+        'aria-label': 'Toggle theme',
+        onClick: toggleTheme,
+      }, [icon(state.theme === 'dark' ? 'sun' : 'moon', 15)]),
+    ]),
   ]);
 
   // Main Content Canvas
@@ -142,10 +200,7 @@ function render() {
 async function boot() {
   applyTheme();
   try {
-    const res = await fetch('local-data/snapshot.json', { cache: 'no-store' });
-    if (!res.ok) throw new Error('Snapshot not found');
-    const snap = await res.json();
-    hub = buildHub(snap);
+    await fetchSnapshot();
     render();
   } catch (err) {
     root.replaceChildren(el('div', { class: 'loading-state' }, [

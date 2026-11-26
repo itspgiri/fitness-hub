@@ -6,7 +6,7 @@
 // 5. Monthly Archive & Roadmap (Monthly_Summary + 21-Week Schedule)
 
 import {
-  addDays, allRaces, avg, exerciseHistory, footRuns, formatSet, lastLoggedFor,
+  addDays, allRaces, avg, daysBetween, exerciseHistory, footRuns, formatSet, lastLoggedFor,
   nextRace, planned, prettyDate, pullUpProgress, readiness, recentWins,
   runnaProgress, sessionTotals, shoeMileage, shortMonth, stepTarget, sum,
   trackedExercises, weekView, zone2Low, zone2Max,
@@ -46,6 +46,26 @@ export function renderTodayView(hub, state, redraw) {
 
   const activeToggleCount = Object.values(state.toggles).filter(Boolean).length;
 
+  // Build race countdown slide pill (real % elapsed from Runna W1 start to race date)
+  let raceSlideEl = null;
+  if (race) {
+    const planStart = hub.plan.weeks.length ? hub.plan.weeks[0].start : addDays(today, -28);
+    const totalBuildDays = Math.max(1, daysBetween(planStart, race.date));
+    const elapsedDays = Math.max(0, totalBuildDays - Math.max(0, race.days));
+    const racePct = Math.max(4, Math.min(100, (elapsedDays / totalBuildDays) * 100));
+    raceSlideEl = el('div', {
+      class: 'race-slide-pill',
+      title: `${race.name} (${race.distance}) • ${prettyDate(race.date, false)} • ${Math.round(racePct)}% of build complete`,
+    }, [
+      el('span', { class: 'race-slide-name', text: race.name }),
+      el('span', { class: 'race-slide-track' }, [
+        el('div', { class: 'race-slide-fill', style: { width: `${racePct.toFixed(1)}%` } }),
+        el('div', { class: 'race-slide-thumb', style: { left: `${racePct.toFixed(1)}%` } }),
+      ]),
+      el('span', { class: 'race-slide-days', text: `${race.days}d left` }),
+    ]);
+  }
+
   // Minimalist Apple-style Header
   frag.appendChild(el('div', { class: 'page-head' }, [
     el('div', {}, [
@@ -53,7 +73,7 @@ export function renderTodayView(hub, state, redraw) {
       el('h1', { class: 'page-title', text: 'Overview' }),
     ]),
     el('div', { class: 'chip-row' }, [
-      race ? el('span', { class: 'muted-xs tabular', text: `${race.days}d to ${race.name}` }) : null,
+      raceSlideEl,
       el('button', {
         type: 'button',
         class: `chip${state.checkinOpen || activeToggleCount ? ' active' : ''}`,

@@ -708,25 +708,29 @@ export function goalTrajectory(hub, today, toggles = {}) {
     planPct * 0.40 + strengthPct * 0.25 + sleepPct * 0.20 + disciplinePct * 0.15,
   ));
 
-  // Skip / Cheat Budget (80% consistency rule = max 1 skipped session/week, 4/month)
+  // Skip / Cheat Budget (80% consistency rule — counts TOTAL runs & lifts done in the month,
+  // NEVER penalizing you for swapping days like doing Tuesday's lift on Wednesday!)
   const monthStart = today.slice(0, 8) + '01';
-  let monthPlannedSessions = 0;
-  let monthMissedSessions = 0;
+  let monthPlannedRuns = 0;
+  let monthPlannedLifts = 0;
   let dCur = monthStart;
   while (dCur < today) {
     const p = planned(hub, dCur);
-    if (p.type === 'run') {
-      monthPlannedSessions++;
-      if (!footRunsOn(hub, dCur).length) monthMissedSessions++;
-    } else if (p.type === 'gym') {
-      monthPlannedSessions++;
-      if (!sessionsOn(hub, dCur).length) monthMissedSessions++;
-    }
+    if (p.type === 'run') monthPlannedRuns++;
+    else if (p.type === 'gym') monthPlannedLifts++;
     dCur = addDays(dCur, 1);
   }
+  const monthActualRuns = runs.filter((r) => r.date >= monthStart && r.date <= today).length;
+  const monthActualLifts = hub.sessions.filter((s) => s.date >= monthStart && s.date <= today).length;
+  const monthPlannedSessions = monthPlannedRuns + monthPlannedLifts;
+  const monthMissedRuns = Math.max(0, monthPlannedRuns - monthActualRuns);
+  const monthMissedLifts = Math.max(0, monthPlannedLifts - monthActualLifts);
+  const monthMissedSessions = monthMissedRuns + monthMissedLifts;
   const monthBudget = Math.max(4, Math.round(monthPlannedSessions * 0.20));
   const skipsLeftMonth = Math.max(0, monthBudget - monthMissedSessions);
-  const weekMissed = wv.days.filter((d) => d.date < today && d.planned.type !== 'rest' && d.done !== 'workout').length;
+  const weekPlannedToDate = wv.days.filter((d) => d.date < today && d.planned.type !== 'rest').length;
+  const weekDoneTotal = wv.runsDone + wv.gymDone;
+  const weekMissed = Math.max(0, weekPlannedToDate - weekDoneTotal);
   const skipsLeftWeek = Math.max(0, 1 - weekMissed);
 
   const longest = runs.reduce((best, r) => (r.km !== null && (!best || r.km > best.km) ? r : best), null);
@@ -764,8 +768,8 @@ export function goalTrajectory(hub, today, toggles = {}) {
   }
 
   const cheatText = skipsLeftMonth > 0
-    ? `Skip budget: ${skipsLeftWeek} left this week · ${skipsLeftMonth} left this month (80% rule). Don’t burn them on low-motivation days.`
-    : `⚠️ 0 skips left this month (${monthMissedSessions} missed vs ${monthBudget} max allowed) — any more skips will knock you off your 28 Feb track.`;
+    ? `Skip budget: ${skipsLeftWeek} left this week · ${skipsLeftMonth} left this month (${monthActualRuns} runs + ${monthActualLifts} lifts done). Don’t burn them on low-motivation days.`
+    : `⚠️ 0 skips left this month (${monthActualRuns}/${monthPlannedRuns} runs, ${monthActualLifts}/${monthPlannedLifts} lifts → ${monthMissedSessions} short vs ${monthBudget} max) — lock in your remaining sessions!`;
 
   return {
     overallScore,

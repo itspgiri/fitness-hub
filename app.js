@@ -1,18 +1,18 @@
 // Main application shell: supports live Google Sheets OAuth (GitHub Pages)
 // and local snapshot preview (localhost). Zero innerHTML, strict CSP-compliant.
 
-import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127m';
-import { icon } from './charts.js?v=20261127m';
-import { el } from './ui.js?v=20261127m';
-import { fetchLiveAqi, fetchLiveAqiCoords, locateBrowserCoords } from './aqi.js?v=20261127m';
+import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127n';
+import { icon } from './charts.js?v=20261127n';
+import { el } from './ui.js?v=20261127n';
+import { fetchLiveAqi, fetchLiveAqiCoords, locateBrowserCoords } from './aqi.js?v=20261127n';
 import {
   fetchLiveSheetSnapshot, isLocalPreviewHost, isOAuthConfigured,
   isSignedIn, signInWithGoogle, signOutGoogle,
-} from './sheets.js?v=20261127m';
+} from './sheets.js?v=20261127n';
 import {
   renderMonthlyView, renderRunningView, renderSleepView,
   renderStrengthView, renderTodayView,
-} from './views.js?v=20261127m';
+} from './views.js?v=20261127n';
 
 const root = document.getElementById('app');
 const CACHE_KEY = 'fh_tab_cache_v1';
@@ -290,7 +290,7 @@ function render() {
       el('div', { class: 'brand-mark', text: 'PG' }),
       el('div', {}, [
         el('div', { class: 'brand-title', text: 'Fitness Hub' }),
-        el('div', { class: 'brand-sub', text: 'Live Telemetry · v3.3' }),
+        el('div', { class: 'brand-sub', text: 'Live Telemetry · v3.4' }),
       ]),
     ]),
     el('nav', { class: 'nav-list', 'aria-label': 'Dashboard sections' }, navItems.map((it) =>

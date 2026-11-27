@@ -57,13 +57,13 @@ async function loadLocalSnapshot() {
   state.today = todayIST();
 }
 
-async function handleSignIn() {
+async function handleSignIn(promptMode = '') {
   if (state.authBusy) return;
   state.authBusy = true;
   state.authError = '';
   render();
   try {
-    await signInWithGoogle('select_account');
+    await signInWithGoogle(promptMode);
     const snap = await fetchLiveSheetSnapshot();
     hub = buildHub(snap);
     state.today = todayIST();
@@ -146,7 +146,17 @@ function renderAuthScreen() {
         class: 'auth-btn',
         disabled: state.authBusy ? 'disabled' : null,
         text: state.authBusy ? 'Connecting to Google Sheets…' : 'Sign in with Google',
-        onClick: handleSignIn,
+        onClick: () => handleSignIn(''),
+      })
+      : null,
+    configured
+      ? el('button', {
+        type: 'button',
+        class: 'chip',
+        style: { marginTop: '10px' },
+        disabled: state.authBusy ? 'disabled' : null,
+        text: 'Choose a different Google account',
+        onClick: () => handleSignIn('select_account'),
       })
       : null,
     state.authError ? el('div', { class: 'auth-err', text: state.authError }) : null,

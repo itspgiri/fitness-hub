@@ -31,6 +31,7 @@ export function icon(name, size = 18) {
     check: [['M20 6L9 17l-5-5']],
     chevron: [['M6 9l6 6 6-6']],
     refresh: [['M21 12a9 9 0 1 1-2.64-6.36', 'M21 3v6h-6']],
+    logout: [['M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4', 'M16 17l5-5-5-5', 'M21 12H9']],
     pulse: [['M2 12h4l3-7 4 14 3-7h6']],
   };
   const def = paths[name] || paths.pulse;

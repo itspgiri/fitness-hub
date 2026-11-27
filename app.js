@@ -1,9 +1,13 @@
-// Main application shell: loads local snapshot, manages navigation, theme & state.
-// Zero innerHTML, zero personal data in code, strict CSP-compliant.
+// Main application shell: supports live Google Sheets OAuth (GitHub Pages)
+// and local snapshot preview (localhost). Zero innerHTML, strict CSP-compliant.
 
 import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js';
 import { icon } from './charts.js';
 import { el } from './ui.js';
+import {
+  fetchLiveSheetSnapshot, isLocalPreviewHost, isOAuthConfigured,
+  isSignedIn, signInWithGoogle, signOutGoogle,
+} from './sheets.js';
 import {
   renderMonthlyView, renderRunningView, renderSleepView,
   renderStrengthView, renderTodayView,
@@ -26,16 +30,61 @@ const state = {
   strengthTab: 'history',
   refreshing: false,
   refreshNote: '',
+  authBusy: false,
+  authError: '',
+  mode: 'loading', // 'loading' | 'auth' | 'ready' | 'error'
 };
 
 let hub = null;
 
-async function fetchSnapshot() {
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', state.theme);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', state.theme === 'dark' ? '#050608' : '#f5f5f7');
+}
+
+function toggleTheme() {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  applyTheme();
+  render();
+}
+
+async function loadLocalSnapshot() {
   const res = await fetch(`local-data/snapshot.json?t=${Date.now()}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error('Snapshot not found');
+  if (!res.ok) throw new Error('Local snapshot not found.');
   const snap = await res.json();
   hub = buildHub(snap);
   state.today = todayIST();
+}
+
+async function handleSignIn() {
+  if (state.authBusy) return;
+  state.authBusy = true;
+  state.authError = '';
+  render();
+  try {
+    await signInWithGoogle('');
+    const snap = await fetchLiveSheetSnapshot();
+    hub = buildHub(snap);
+    state.today = todayIST();
+    state.mode = 'ready';
+  } catch (err) {
+    state.authError = err.message === 'SESSION_EXPIRED'
+      ? 'Session expired. Please sign in again.'
+      : (err.message || 'Sign-in failed.');
+    state.mode = 'auth';
+  } finally {
+    state.authBusy = false;
+    render();
+  }
+}
+
+function handleSignOut() {
+  signOutGoogle();
+  hub = null;
+  state.authError = '';
+  state.mode = 'auth';
+  render();
 }
 
 async function handleRefresh() {
@@ -44,17 +93,30 @@ async function handleRefresh() {
   state.refreshNote = 'Syncing Sheet…';
   render();
   try {
-    const resp = await fetch('/api/refresh', {
-      method: 'POST',
-      headers: { 'X-Requested-With': 'fitness-hub' },
-    });
-    if (!resp.ok && resp.status !== 404 && resp.status !== 405 && resp.status !== 501) {
-      throw new Error('Refresh failed');
+    if (isOAuthConfigured() && isSignedIn()) {
+      const snap = await fetchLiveSheetSnapshot();
+      hub = buildHub(snap);
+      state.today = todayIST();
+      state.refreshNote = 'Updated just now';
+    } else if (isLocalPreviewHost()) {
+      const resp = await fetch('/api/refresh', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'fitness-hub' },
+      });
+      if (!resp.ok && resp.status !== 404 && resp.status !== 405 && resp.status !== 501) {
+        throw new Error('Refresh failed');
+      }
+      await loadLocalSnapshot();
+      state.refreshNote = 'Updated just now';
     }
-    await fetchSnapshot();
-    state.refreshNote = 'Updated just now';
-  } catch {
-    state.refreshNote = 'Refresh failed';
+  } catch (err) {
+    if (err && err.message === 'SESSION_EXPIRED') {
+      hub = null;
+      state.mode = 'auth';
+      state.authError = 'Google session expired — sign in again to refresh.';
+    } else {
+      state.refreshNote = 'Refresh failed';
+    }
   } finally {
     state.refreshing = false;
     render();
@@ -67,24 +129,46 @@ async function handleRefresh() {
   }
 }
 
-function applyTheme() {
-  document.documentElement.setAttribute('data-theme', state.theme);
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', state.theme === 'dark' ? '#070a12' : '#f4f6fb');
-}
-
-function toggleTheme() {
-  state.theme = state.theme === 'dark' ? 'light' : 'dark';
-  applyTheme();
-  render();
+function renderAuthScreen() {
+  const configured = isOAuthConfigured();
+  const card = el('div', { class: 'auth-card' }, [
+    el('div', { class: 'auth-mark', text: 'PG' }),
+    el('h1', { class: 'auth-title', text: 'Fitness Hub' }),
+    el('p', {
+      class: 'auth-sub',
+      text: configured
+        ? 'Sign in with your Google account to load live Ring, Strava, and Hevy telemetry directly from your private Sheet.'
+        : 'Add your Google OAuth Client ID to config.js to enable live Google Sheets sign-in.',
+    }),
+    configured
+      ? el('button', {
+        type: 'button',
+        class: 'auth-btn',
+        disabled: state.authBusy ? 'disabled' : null,
+        text: state.authBusy ? 'Connecting to Google Sheets…' : 'Sign in with Google',
+        onClick: handleSignIn,
+      })
+      : null,
+    state.authError ? el('div', { class: 'auth-err', text: state.authError }) : null,
+    el('div', {
+      class: 'auth-note',
+      text: 'Read-only Google Sheets access · Token stays strictly in memory.',
+    }),
+  ]);
+  root.replaceChildren(el('div', { class: 'auth-wrap' }, [card]));
 }
 
 function render() {
+  if (state.mode === 'auth') {
+    renderAuthScreen();
+    return;
+  }
   if (!hub) return;
   root.replaceChildren();
 
   const fresh = freshness(hub);
   const race = nextRace(hub, state.today);
+  const showLogout = isOAuthConfigured() && isSignedIn();
 
   const navItems = [
     { id: 'today', label: 'Today', ico: 'today', badge: null },
@@ -93,6 +177,33 @@ function render() {
     { id: 'sleep', label: 'Sleep & Ring', ico: 'sleep', badge: `${hub.ringList.length}d` },
     { id: 'monthly', label: 'Monthly', ico: 'archive', badge: String(hub.monthly.length) },
   ];
+
+  const actionBtns = [
+    el('button', {
+      type: 'button',
+      class: `icon-btn${state.refreshing ? ' spinning' : ''}`,
+      title: 'Fetch latest data from Google Sheet',
+      'aria-label': 'Refresh data',
+      disabled: state.refreshing ? 'disabled' : null,
+      onClick: handleRefresh,
+    }, [icon('refresh', 15)]),
+    el('button', {
+      type: 'button',
+      class: 'icon-btn',
+      title: `Switch to ${state.theme === 'dark' ? 'light' : 'dark'} theme`,
+      'aria-label': 'Toggle theme',
+      onClick: toggleTheme,
+    }, [icon(state.theme === 'dark' ? 'sun' : 'moon', 15)]),
+  ];
+  if (showLogout) {
+    actionBtns.push(el('button', {
+      type: 'button',
+      class: 'icon-btn',
+      title: 'Sign out',
+      'aria-label': 'Sign out',
+      onClick: handleSignOut,
+    }, [icon('logout', 15)]));
+  }
 
   // Desktop Sidebar
   const sidebar = el('aside', { class: 'sidebar' }, [
@@ -125,23 +236,7 @@ function render() {
         el('span', { class: `sync-dot${fresh.stale ? ' stale' : ''}` }),
         el('span', { text: state.refreshNote || fresh.label }),
       ]),
-      el('div', { class: 'foot-actions' }, [
-        el('button', {
-          type: 'button',
-          class: `icon-btn${state.refreshing ? ' spinning' : ''}`,
-          title: 'Fetch latest data from Google Sheet',
-          'aria-label': 'Refresh data',
-          disabled: state.refreshing ? 'disabled' : null,
-          onClick: handleRefresh,
-        }, [icon('refresh', 15)]),
-        el('button', {
-          type: 'button',
-          class: 'icon-btn',
-          title: `Switch to ${state.theme === 'dark' ? 'light' : 'dark'} theme`,
-          'aria-label': 'Toggle theme',
-          onClick: toggleTheme,
-        }, [icon(state.theme === 'dark' ? 'sun' : 'moon', 15)]),
-      ]),
+      el('div', { class: 'foot-actions' }, actionBtns),
     ]),
   ]);
 
@@ -199,15 +294,23 @@ function render() {
 
 async function boot() {
   applyTheme();
-  try {
-    await fetchSnapshot();
+  if (isOAuthConfigured()) {
+    state.mode = 'auth';
     render();
-  } catch (err) {
-    root.replaceChildren(el('div', { class: 'loading-state' }, [
-      el('h2', { text: 'Unable to load telemetry snapshot' }),
-      el('p', { text: err.message }),
-    ]));
+    return;
   }
+  if (isLocalPreviewHost()) {
+    try {
+      await loadLocalSnapshot();
+      state.mode = 'ready';
+      render();
+      return;
+    } catch (err) {
+      state.authError = err.message || 'Could not load local snapshot.';
+    }
+  }
+  state.mode = 'auth';
+  render();
 }
 
 boot();

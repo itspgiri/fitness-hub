@@ -14,7 +14,10 @@ export const STALE_HOURS = 8;
 
 export function num(v) {
   if (v === null || v === undefined || v === '') return null;
-  const n = Number(v);
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const cleaned = String(v).replace(/[,%\s]+/g, '');
+  if (!cleaned) return null;
+  const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 }
 

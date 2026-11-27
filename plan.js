@@ -677,12 +677,12 @@ export function goalTrajectory(hub, today, toggles = {}) {
   });
   actualToDate = Math.round(actualToDate * 10) / 10;
   plannedToDate = Math.round(plannedToDate * 10) / 10;
-  const planPct = plannedToDate > 0 ? Math.min(100, Math.round((actualToDate / plannedToDate) * 100)) : 100;
+  const planPct = plannedToDate > 0 ? Math.min(125, Math.round((actualToDate / plannedToDate) * 100)) : 100;
 
-  // 2. Strength Consistency (last 14 days vs 6 planned lifts)
+  // 2. Strength Consistency (last 14 days vs 6 planned lifts — allows >100% bonus)
   const from14 = addDays(today, -13);
   const lifts14 = hub.sessions.filter((s) => s.date >= from14 && s.date <= today).length;
-  const strengthPct = Math.min(100, Math.round((lifts14 / 6) * 100));
+  const strengthPct = Math.min(125, Math.round((lifts14 / 6) * 100));
 
   // 3. Sleep Consistency (last 7 days vs 7.5h target)
   const from7 = addDays(today, -6);
@@ -691,18 +691,20 @@ export function goalTrajectory(hub, today, toggles = {}) {
   const sessions7 = runs7.length + lifts7.length;
   const ring7 = hub.ringList.filter((r) => r.date >= from7 && r.date <= today);
   const sleep7 = avg(ring7.map((r) => r.sleep));
-  const sleepPct = sleep7 !== null ? Math.min(100, Math.round((sleep7 / 7.5) * 100)) : 80;
+  const rec7 = avg(ring7.map((r) => r.recovery));
+  const sleepPct = sleep7 !== null ? Math.min(115, Math.round((sleep7 / 7.5) * 100)) : 80;
+  const recoveringWell = (sleep7 === null || sleep7 >= 7.5) && (rec7 === null || rec7 >= 70);
 
   // 4. Steps + Zone 2 Discipline (last 14 days)
   const ring14 = hub.ringList.filter((r) => r.date >= from14 && r.date <= today && r.steps !== null && r.steps > 0);
   const stepHitPct = ring14.length ? Math.round((ring14.filter((r) => r.steps >= sTarget).length / ring14.length) * 100) : 70;
   const recentHrRuns = runs.filter((r) => r.avgHr !== null).slice(0, 5);
   const avgHr5 = avg(recentHrRuns.map((r) => r.avgHr));
-  const z2PctScore = avgHr5 !== null ? Math.min(100, Math.round((z2Hi / avgHr5) * 100)) : 80;
+  const z2PctScore = avgHr5 !== null ? Math.min(110, Math.round((z2Hi / avgHr5) * 100)) : 80;
   const disciplinePct = Math.round(stepHitPct * 0.5 + z2PctScore * 0.5);
 
-  // Weighted overall score (genuinely reaches 100% when hitting current week's plan!)
-  const overallScore = Math.min(100, Math.round(
+  // Weighted overall score (can exceed 100% when exceeding plan + recovering well)
+  const overallScore = Math.min(125, Math.round(
     planPct * 0.40 + strengthPct * 0.25 + sleepPct * 0.20 + disciplinePct * 0.15,
   ));
 
@@ -743,14 +745,14 @@ export function goalTrajectory(hub, today, toggles = {}) {
     callout = 'Girl, low energy isn’t a free pass — show up for 20 min 💪';
     tone = 'stop';
     forecast = 'Low motivation doesn’t get a skip. Put on your shoes for a 20-min Express lift (3 moves) or easy 2 km walk/jog — action creates energy.';
-  } else if (overallScore >= 95) {
+  } else if (overallScore >= 100 && recoveringWell) {
     callout = 'Girl, you are ON FIRE — you’re doing amazing 🔥';
     tone = 'ok';
-    forecast = `100% locked in (${actualToDate}/${plannedToDate} km to date · ${lifts14}/6 lifts in 14d). At this pace you’re going to crush ${raceTag}.`;
+    forecast = `${overallScore}% on-goal AND recovering strong (${actualToDate}/${plannedToDate} km · ${lifts14}/6 lifts · ${sleep7 ? sleep7.toFixed(1) + 'h' : '7.5h+'} sleep). You’re going to crush ${raceTag}!`;
   } else if (overallScore >= 80) {
     callout = 'You’re fine, just relax — right on track ✨';
     tone = 'ok';
-    forecast = `Above 80% consistency (${actualToDate}/${plannedToDate} km · ${lifts14}/6 lifts). Stay steady with easy Zone 2 runs and you’re golden for ${raceTag}.`;
+    forecast = `${overallScore}% consistency (${actualToDate}/${plannedToDate} km · ${lifts14}/6 lifts). Stay steady with easy Zone 2 runs and good sleep and you’re golden for ${raceTag}.`;
   } else if (overallScore >= 60) {
     callout = 'Girl, we need to buckle up 💪';
     tone = 'warn';

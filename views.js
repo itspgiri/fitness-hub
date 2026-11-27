@@ -11,10 +11,10 @@ import {
   prettyDate, pullUpProgress, readiness, recalibratePlan, recentWins, runnaProgress,
   runningPRs, sessionTotals, shoeMileage, shortMonth, sleepDebt7d, sleepSweetSpot,
   stepTarget, strengthPRWall, sum, trackedExercises, weekView, zone2Low, zone2Max,
-} from './plan.js?v=20261127g';
-import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127g';
-import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127g';
-import { CITIES } from './aqi.js?v=20261127g';
+} from './plan.js?v=20261127h';
+import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127h';
+import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127h';
+import { CITIES } from './aqi.js?v=20261127h';
 
 const fmt = (n, d = 1) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : n.toFixed(d));
 const fmtInt = (n) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : Math.round(n).toLocaleString());
@@ -69,7 +69,7 @@ export function renderTodayView(hub, state, redraw) {
   const z2Hi = zone2Max(hub);
   const race = nextRace(hub, today);
 
-  const activeToggleCount = Object.values(state.toggles).filter(Boolean).length;
+  const activeToggleCount = ['ankle', 'period', 'low', 'short', 'late'].filter((k) => state.toggles[k]).length;
 
   // Build race countdown slide pill (real % elapsed from Runna W1 start to race date)
   let raceSlideEl = null;
@@ -99,6 +99,25 @@ export function renderTodayView(hub, state, redraw) {
     ]),
     el('div', { class: 'chip-row' }, [
       raceSlideEl,
+      el('button', {
+        type: 'button',
+        class: `chip${state.toggles.feelGood ? ' active' : ''}`,
+        text: state.toggles.feelGood ? '✓ I feel good' : 'I feel good',
+        onClick: () => {
+          const next = !state.toggles.feelGood;
+          state.toggles.feelGood = next;
+          if (next) {
+            state.toggles.period = false;
+            state.toggles.low = false;
+            state.toggles.short = false;
+            state.toggles.late = false;
+            state.recalOpen = false;
+            state.recalReason = null;
+            state.fallbackMode = 'planned';
+          }
+          redraw();
+        },
+      }),
       el('button', {
         type: 'button',
         class: `chip${state.checkinOpen || activeToggleCount ? ' active' : ''}`,
@@ -277,7 +296,11 @@ export function renderTodayView(hub, state, redraw) {
           type: 'button',
           class: `chip${t.danger ? ' danger' : ''}${state.toggles[t.key] ? ' active' : ''}`,
           text: t.label,
-          onClick: () => { state.toggles[t.key] = !state.toggles[t.key]; redraw(); },
+          onClick: () => {
+            state.toggles[t.key] = !state.toggles[t.key];
+            if (state.toggles[t.key]) state.toggles.feelGood = false;
+            redraw();
+          },
         }),
       )),
     ]));

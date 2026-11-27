@@ -517,6 +517,12 @@ export function readiness(hub, today, dayType, toggles) {
   let level = flagged ? 'easy' : 'ok';
   let headline;
   if (toggles && toggles.ankle) { headline = 'Protect the ankle — no running today'; level = 'stop'; }
+  else if (toggles && toggles.feelGood) {
+    level = 'ok';
+    headline = flagged
+      ? 'You feel good — go with your plan, keep HR ≤ 163'
+      : 'Feeling good & metrics agree — full green light';
+  }
   else if (toggles && toggles.period) { headline = 'Go by feel — honour your energy'; level = 'easy'; }
   else if (dayType === 'rest') { headline = flagged ? 'Recovery day — well timed' : 'Planned rest & mobility day'; }
   else if (y.any && y2.any) { headline = 'Two hot/late days — consider swapping'; level = 'swap'; }

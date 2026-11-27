@@ -1,18 +1,18 @@
 // Main application shell: supports live Google Sheets OAuth (GitHub Pages)
 // and local snapshot preview (localhost). Zero innerHTML, strict CSP-compliant.
 
-import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127g';
-import { icon } from './charts.js?v=20261127g';
-import { el } from './ui.js?v=20261127g';
-import { fetchLiveAqi, fetchLiveAqiCoords, locateBrowserCoords } from './aqi.js?v=20261127g';
+import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127h';
+import { icon } from './charts.js?v=20261127h';
+import { el } from './ui.js?v=20261127h';
+import { fetchLiveAqi, fetchLiveAqiCoords, locateBrowserCoords } from './aqi.js?v=20261127h';
 import {
   fetchLiveSheetSnapshot, isLocalPreviewHost, isOAuthConfigured,
   isSignedIn, signInWithGoogle, signOutGoogle,
-} from './sheets.js?v=20261127g';
+} from './sheets.js?v=20261127h';
 import {
   renderMonthlyView, renderRunningView, renderSleepView,
   renderStrengthView, renderTodayView,
-} from './views.js?v=20261127g';
+} from './views.js?v=20261127h';
 
 const root = document.getElementById('app');
 const CACHE_KEY = 'fh_tab_cache_v1';
@@ -53,7 +53,7 @@ const state = {
   theme: 'light',
   today: todayIST(),
   selectedDay: todayIST(),
-  toggles: { ankle: false, period: false, low: false, short: false, late: false },
+  toggles: { ankle: false, period: false, low: false, short: false, late: false, feelGood: false },
   checkinOpen: false,
   warmupOpen: false,
   expanded: {},
@@ -290,7 +290,7 @@ function render() {
       el('div', { class: 'brand-mark', text: 'PG' }),
       el('div', {}, [
         el('div', { class: 'brand-title', text: 'Fitness Hub' }),
-        el('div', { class: 'brand-sub', text: 'Live Telemetry · v2.7' }),
+        el('div', { class: 'brand-sub', text: 'Live Telemetry · v2.8' }),
       ]),
     ]),
     el('nav', { class: 'nav-list', 'aria-label': 'Dashboard sections' }, navItems.map((it) =>

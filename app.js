@@ -1,18 +1,18 @@
 // Main application shell: supports live Google Sheets OAuth (GitHub Pages)
 // and local snapshot preview (localhost). Zero innerHTML, strict CSP-compliant.
 
-import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127d';
-import { icon } from './charts.js?v=20261127d';
-import { el } from './ui.js?v=20261127d';
-import { fetchLiveAqi, fetchLiveAqiCoords, locateBrowserCoords } from './aqi.js?v=20261127d';
+import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127e';
+import { icon } from './charts.js?v=20261127e';
+import { el } from './ui.js?v=20261127e';
+import { fetchLiveAqi, fetchLiveAqiCoords, locateBrowserCoords } from './aqi.js?v=20261127e';
 import {
   fetchLiveSheetSnapshot, isLocalPreviewHost, isOAuthConfigured,
   isSignedIn, signInWithGoogle, signOutGoogle,
-} from './sheets.js?v=20261127d';
+} from './sheets.js?v=20261127e';
 import {
   renderMonthlyView, renderRunningView, renderSleepView,
   renderStrengthView, renderTodayView,
-} from './views.js?v=20261127d';
+} from './views.js?v=20261127e';
 
 const root = document.getElementById('app');
 const CACHE_KEY = 'fh_tab_cache_v1';
@@ -76,11 +76,15 @@ const state = {
 
 let hub = null;
 
+function getWaqiToken() {
+  return (hub && hub.plan && hub.plan.meta && hub.plan.meta.waqi_token) || '';
+}
+
 async function refreshAqi(cityId) {
   state.aqiCity = cityId || state.aqiCity;
   state.aqiError = '';
   try {
-    state.aqiData = await fetchLiveAqi(state.aqiCity);
+    state.aqiData = await fetchLiveAqi(state.aqiCity, getWaqiToken());
   } catch {
     state.aqiData = null;
   }
@@ -102,7 +106,7 @@ state.onLocateMe = async () => {
   try {
     const coords = await locateBrowserCoords();
     state.aqiCity = 'gps';
-    state.aqiData = await fetchLiveAqiCoords(coords);
+    state.aqiData = await fetchLiveAqiCoords(coords, getWaqiToken());
   } catch (err) {
     state.aqiError = err && err.message ? err.message : 'Could not get location.';
   } finally {
@@ -143,6 +147,7 @@ async function handleSignIn(promptMode = '') {
     hub = buildHub(snap);
     state.today = todayIST();
     state.mode = 'ready';
+    refreshAqi(state.aqiCity);
   } catch (err) {
     state.authError = err.message === 'SESSION_EXPIRED'
       ? 'Session expired. Please sign in again.'
@@ -376,6 +381,7 @@ async function boot() {
       state.today = todayIST();
       state.mode = 'ready';
       render();
+      refreshAqi(state.aqiCity);
       return;
     }
     state.mode = 'auth';

@@ -10,10 +10,10 @@ import {
   latestRingWith, nextRace, planned, prettyDate, pullUpProgress, readiness, recentWins,
   runnaProgress, sessionTotals, shoeMileage, shortMonth, stepTarget, sum,
   trackedExercises, weekView, zone2Low, zone2Max,
-} from './plan.js?v=20261127d';
-import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127d';
-import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127d';
-import { CITIES } from './aqi.js?v=20261127d';
+} from './plan.js?v=20261127e';
+import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127e';
+import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127e';
+import { CITIES } from './aqi.js?v=20261127e';
 
 const fmt = (n, d = 1) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : n.toFixed(d));
 const fmtInt = (n) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : Math.round(n).toLocaleString());
@@ -107,18 +107,29 @@ export function renderTodayView(hub, state, redraw) {
     ]),
   ]));
 
-  // Live Outdoor Run AQI & Spontaneous Run Advisor Bar
+  // Live Dual-Source Outdoor Run AQI & Spontaneous Run Advisor Bar
   const aq = state.aqiData;
   const cityObj = CITIES.find((c) => c.id === state.aqiCity) || CITIES[0];
   const locName = aq && aq.city && aq.city.name ? aq.city.name : cityObj.name;
-  const aqicnUrl = aq && aq.city && aq.city.aqicn ? aq.city.aqicn : cityObj.aqicn;
-  const verdict = aq ? aq.verdict : { label: 'Checking live AQI…', action: 'Loading outdoor air quality & temperature', tone: 'info' };
+  const aqiLinkUrl = aq && aq.city && aq.city.link ? aq.city.link : cityObj.link;
+  const verdict = aq ? aq.verdict : { label: 'Checking live AQI…', action: 'Loading CPCB ground & model air quality', tone: 'info' };
+  const sourceParts = [];
+  if (aq && aq.groundAqi !== null) {
+    sourceParts.push(`CPCB Ground: ${aq.groundAqi}${aq.station ? ` (${aq.station})` : ''}`);
+  }
+  if (aq && aq.modelAqi !== null) {
+    sourceParts.push(`Model: ${aq.modelAqi}`);
+  }
+  if (aq && aq.tempC !== null) sourceParts.push(`${aq.tempC.toFixed(1)} °C`);
+  if (aq && aq.humidity !== null) sourceParts.push(`${aq.humidity}% RH`);
+  sourceParts.push(`Spontaneous run: 3–5 km ≤ ${z2Hi} bpm`);
+
   const spontaneousAdvice = state.aqiError
     ? state.aqiError
     : state.toggles.ankle
       ? 'Ankle swollen — skip running (outdoor or treadmill) today.'
       : aq
-        ? `${verdict.action} · Spontaneous run: 3–5 km easy ≤ ${z2Hi} bpm${aq.tempC !== null ? ` · ${aq.tempC.toFixed(1)} °C` : ''}${aq.humidity !== null ? ` · ${aq.humidity}% RH` : ''}${aq.pm25 !== null ? ` · PM2.5 ${aq.pm25}` : ''}`
+        ? `${verdict.action} · ${sourceParts.join(' · ')}`
         : verdict.action;
 
   const citySelect = el('select', {
@@ -142,13 +153,13 @@ export function renderTodayView(hub, state, redraw) {
     onClick: () => { if (state.onLocateMe) state.onLocateMe(); },
   });
 
-  const aqicnLink = safeExternalLink(aqicnUrl, 'AQICN ↗');
+  const aqiInLink = safeExternalLink(aqiLinkUrl, 'AQI.in ↗');
 
   frag.appendChild(el('section', { class: 'aqi-bar' }, [
     el('div', { class: 'aqi-left' }, [
       el('div', { class: `aqi-badge ${state.toggles.ankle ? 'stop' : verdict.tone}` }, [
         el('span', { class: 'aqi-num', text: aq && aq.aqi !== null ? String(aq.aqi) : '—' }),
-        el('span', { class: 'aqi-lbl', text: 'US AQI' }),
+        el('span', { class: 'aqi-lbl', text: aq && aq.groundAqi !== null ? 'CPCB / US' : 'US AQI' }),
       ]),
       el('div', { style: { minWidth: 0 } }, [
         el('div', {
@@ -161,7 +172,7 @@ export function renderTodayView(hub, state, redraw) {
     el('div', { class: 'aqi-right' }, [
       citySelect,
       locateBtn,
-      aqicnLink,
+      aqiInLink,
     ]),
   ]));
 

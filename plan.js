@@ -639,12 +639,13 @@ export function freshness(hub) {
 
 // ---- "Are You On Track?" Live Coaching Scorecard ----------------------------
 
-export function onTrackScorecard(hub, today) {
+export function onTrackScorecard(hub, today, toggles = {}) {
   const wv = weekView(hub, today);
   const sTarget = stepTarget(hub);
   const z2Hi = zone2Max(hub);
   const last7Ring = hub.ringList.slice(-7);
   const last14Ring = hub.ringList.slice(-14);
+  const gentleMode = Boolean(toggles && (toggles.period || toggles.low));
 
   // 1. Sleep (7d avg vs 7.5h floor / 8h goal)
   const sleep7 = avg(last7Ring.map((r) => r.sleep));
@@ -654,12 +655,12 @@ export function onTrackScorecard(hub, today) {
   const dow = (toDate(today).getUTCDay() + 6) % 7; // Mon=0..Sun=6
   const runPct = wv.weekKm ? (wv.runKm / wv.weekKm) * 100 : 0;
   const expectedRunPct = dow >= 5 ? 60 : dow >= 2 ? 25 : 0;
-  const runStatus = wv.weekKm ? (runPct >= 85 || runPct >= expectedRunPct ? 'ok' : dow >= 3 ? 'warn' : 'ok') : 'info';
+  const runStatus = gentleMode ? 'info' : (wv.weekKm ? (runPct >= 85 || runPct >= expectedRunPct ? 'ok' : dow >= 3 ? 'warn' : 'ok') : 'info');
 
   // 3. Weekly Strength (Gym sessions vs 3/wk)
   const gymPct = wv.gymPlanned ? (wv.gymDone / wv.gymPlanned) * 100 : 0;
   const expectedGym = dow >= 5 ? 2 : dow >= 2 ? 1 : 0;
-  const gymStatus = wv.gymDone >= wv.gymPlanned ? 'ok' : wv.gymDone >= expectedGym ? 'ok' : 'warn';
+  const gymStatus = gentleMode ? 'info' : (wv.gymDone >= wv.gymPlanned ? 'ok' : wv.gymDone >= expectedGym ? 'ok' : 'warn');
 
   // 4. Daily Steps consistency (14d >= 7,500)
   const stepDays = last14Ring.filter((r) => r.steps !== null && r.steps > 0);
@@ -682,14 +683,14 @@ export function onTrackScorecard(hub, today) {
     {
       name: `Runs (W${wv.weekNum ?? ''})`,
       value: `${wv.runKm} / ${wv.weekKm ?? '—'} km`,
-      target: wv.runsLeft > 0 ? `${wv.runsLeft} run${wv.runsLeft === 1 ? '' : 's'} left` : 'Target hit',
+      target: gentleMode ? 'Optional on period/low days' : (wv.runsLeft > 0 ? `${wv.runsLeft} run${wv.runsLeft === 1 ? '' : 's'} left` : 'Target hit'),
       status: runStatus,
       pct: Math.min(100, runPct),
     },
     {
       name: 'Strength',
       value: `${wv.gymDone} / ${wv.gymPlanned} lifts`,
-      target: wv.gymLeft > 0 ? `${wv.gymLeft} left this week` : 'Target hit',
+      target: gentleMode ? 'Go by feel today' : (wv.gymLeft > 0 ? `${wv.gymLeft} left this week` : 'Target hit'),
       status: gymStatus,
       pct: Math.min(100, gymPct),
     },
@@ -711,20 +712,86 @@ export function onTrackScorecard(hub, today) {
 
   const scored = pillars.filter((p) => p.status !== 'info');
   const okCount = scored.filter((p) => p.status === 'ok').length;
-  const scorePct = scored.length ? Math.round((okCount / scored.length) * 100) : 0;
+  const scorePct = scored.length ? Math.round((okCount / scored.length) * 100) : 100;
 
   let verdict = 'On Track';
   let tone = 'ok';
-  if (scorePct < 50) { verdict = 'Needs Reset'; tone = 'warn'; }
-  else if (scorePct < 80) { verdict = 'Mostly On Track'; tone = 'warn'; }
+  if (gentleMode) { verdict = 'Recovery / Period Mode'; tone = 'ok'; }
+  else if (scorePct < 50) { verdict = 'Gentle Week'; tone = 'warn'; }
+  else if (scorePct < 80) { verdict = 'Building Momentum'; tone = 'warn'; }
 
   const strengths = pillars.filter((p) => p.status === 'ok').map((p) => p.name);
   const focus = pillars.find((p) => p.status === 'off') || pillars.find((p) => p.status === 'warn');
-  const summary = focus
-    ? `${okCount}/${scored.length} pillars green${strengths.length ? ` (${strengths.slice(0, 2).join(' & ')} strong)` : ''}. Next focus: ${focus.name} (${focus.value} vs ${focus.target}).`
-    : `All ${okCount}/${scored.length} pillars green — keep this exact rhythm going.`;
+  const summary = gentleMode
+    ? 'Period / low-energy mode active — rest, sleep, and easy walks count as full wins. Zero guilt about skipped runs or lifts.'
+    : focus
+      ? `${okCount}/${scored.length} pillars steady${strengths.length ? ` (${strengths.slice(0, 2).join(' & ')} solid)` : ''}. One easy win next: ${focus.name} (${focus.value} vs ${focus.target}).`
+      : `All ${okCount}/${scored.length} pillars steady — keep this exact rhythm going.`;
 
   return { verdict, tone, scorePct, okCount, total: scored.length, summary, pillars };
+}
+
+// ---- "Recalibrate My Week" Guilt-Free Bounce-Back Engine --------------------
+
+export function recalibratePlan(hub, today, reason) {
+  const z2Hi = zone2Max(hub);
+  const d1 = prettyDate(today, true);
+  const d2 = prettyDate(addDays(today, 1), true);
+  const d3 = prettyDate(addDays(today, 2), true);
+  const nextPlan2 = planned(hub, addDays(today, 1));
+  const nextPlan3 = planned(hub, addDays(today, 2));
+
+  if (reason === 'period') {
+    return {
+      title: 'Period & Exhaustion Bounce-Back Plan',
+      reassurance: 'Period fatigue is real physiology (progesterone drop + iron/fluid shifts) — you did not lose fitness and you do not owe anyone missed workouts.',
+      days: [
+        { day: d1, label: 'Pure Rest or 15-Min Easy Walk', detail: 'Hydrate, eat iron + protein, warm shower, and aim for bed before 12:30 am. Zero guilt if you do nothing.' },
+        { day: d2, label: 'Gentle Mobility or 20-Min Light Upper', detail: 'Only if energy lifts: 10 min hip/back mobility or 2 light sets of your favorite upper-body moves.' },
+        { day: d3, label: 'Easy Restart (Walk/Jog ≤ 155 bpm)', detail: '2–3 km super easy run/walk or 25-min Express Gym. Resume normal Runna week once cramps & fatigue pass.' },
+      ],
+    };
+  }
+  if (reason === 'missed') {
+    const wv = weekView(hub, today);
+    const remaining = wv.days.filter((d) => d.date >= today && d.planned.type !== 'rest');
+    const firstNext = remaining[0];
+    return {
+      title: 'Clean Slate — Zero Cramming Plan',
+      reassurance: 'Missing 3–5 days loses ZERO aerobic fitness or strength. Golden rule: NEVER try to "make up" missed runs — cramming causes injury.',
+      days: [
+        {
+          day: d1,
+          label: firstNext ? `Pick up gently: ${firstNext.planned.session}` : 'Easy 20-Min Walk + Mobility',
+          detail: firstNext && firstNext.planned.type === 'run'
+            ? `Do just ${Math.max(2, Math.round((firstNext.planned.km || 3) * 0.75 * 2) / 2)} km super easy (≤ ${z2Hi} bpm) to break the ice.`
+            : 'Do just the first 3 compound lifts (2 sets each) — getting through the door is 100% of the win.',
+        },
+        { day: d2, label: `Normal rhythm: ${nextPlan2.session}`, detail: 'Keep effort conversational and finish before 8:00 pm so sleep stays strong.' },
+        { day: d3, label: `Back in groove: ${nextPlan3.session}`, detail: 'Move straight into next week’s Runna plan as written — leave the skipped days behind.' },
+      ],
+    };
+  }
+  if (reason === 'sleep') {
+    return {
+      title: '48-Hour Sleep & Nervous System Reset',
+      reassurance: 'Training hard on deep sleep debt backfires. Two good nights of sleep will give you 10× more progress than forcing a tired workout.',
+      days: [
+        { day: d1, label: 'Sleep Priority + Easy Steps Only', detail: 'Skip intense sessions. Aim for screens off early and asleep before 1:00 am (your personal 84-score sweet-spot!).' },
+        { day: d2, label: '25-Min Express or 20-Min Easy Z2', detail: 'Keep HR strictly ≤ 155 bpm or do 2 working sets per lift. Finish before 8:00 pm.' },
+        { day: d3, label: 'Resume Full Plan', detail: 'Once Sleep Score ≥ 75 and Recovery ≥ 70, jump back into your scheduled session.' },
+      ],
+    };
+  }
+  return {
+    title: 'Ankle-Safe 5-Day Pivot Plan',
+    reassurance: 'Protecting a swollen ankle now saves weeks later — you can keep building upper-body & core strength while the ankle settles.',
+    days: [
+      { day: d1, label: 'Hard Stop on Running + Rest/Elevate', detail: 'Zero impact, zero running. Gentle pain-free ankle circles only if comfortable.' },
+      { day: d2, label: 'Seated Upper Body / Core Only', detail: 'Upper A or Upper B seated/supported lifts — skip standing heavy loads.' },
+      { day: d3, label: 'Re-check Swelling', detail: 'Only return to easy 2 km walk/jog once swelling is 100% gone for 24+ hours.' },
+    ],
+  };
 }
 
 // ---- Smart Auto-Fallback Coach ----------------------------------------------

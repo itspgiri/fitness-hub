@@ -8,13 +8,13 @@
 import {
   addDays, allRaces, autoFallback, avg, daysBetween, exerciseHistory, footRuns, formatSet,
   lastLoggedFor, latestRingWith, nextRace, onTrackScorecard, overloadNudge, planned,
-  prettyDate, pullUpProgress, readiness, recentWins, runnaProgress, runningPRs,
-  sessionTotals, shoeMileage, shortMonth, sleepDebt7d, sleepSweetSpot, stepTarget,
-  strengthPRWall, sum, trackedExercises, weekView, zone2Low, zone2Max,
-} from './plan.js?v=20261127f';
-import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127f';
-import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127f';
-import { CITIES } from './aqi.js?v=20261127f';
+  prettyDate, pullUpProgress, readiness, recalibratePlan, recentWins, runnaProgress,
+  runningPRs, sessionTotals, shoeMileage, shortMonth, sleepDebt7d, sleepSweetSpot,
+  stepTarget, strengthPRWall, sum, trackedExercises, weekView, zone2Low, zone2Max,
+} from './plan.js?v=20261127g';
+import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127g';
+import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127g';
+import { CITIES } from './aqi.js?v=20261127g';
 
 const fmt = (n, d = 1) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : n.toFixed(d));
 const fmtInt = (n) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : Math.round(n).toLocaleString());
@@ -319,22 +319,40 @@ export function renderTodayView(hub, state, redraw) {
     el('div', { class: 'hero-brief' }, heroBriefKids),
   ]));
 
-  // Section 1B: "Are You On Track?" Live Coaching Scorecard
-  const track = onTrackScorecard(hub, today);
-  frag.appendChild(el('section', { class: 'ontrack-card' }, [
+  // Section 1B: "Are You On Track?" Live Coaching Scorecard + 1-Click Recalibrate
+  const track = onTrackScorecard(hub, today, state.toggles);
+  const recalReasons = [
+    { id: 'period', label: 'Period / Exhausted' },
+    { id: 'missed', label: 'Missed a few days' },
+    { id: 'sleep', label: 'Rough sleep' },
+    { id: 'ankle', label: 'Ankle flare-up' },
+  ];
+  const activeRecal = state.recalReason ? recalibratePlan(hub, today, state.recalReason) : null;
+
+  const onTrackKids = [
     el('div', { class: 'ontrack-head' }, [
       el('div', {}, [
         el('div', { class: 'ontrack-title-row' }, [
           el('h3', { class: 'card-title', text: 'Are You On Track?' }),
           pill(track.verdict, track.tone === 'ok' ? 'green' : 'amber'),
-          el('span', { class: 'muted-xs tabular', text: `${track.okCount}/${track.total} pillars green` }),
+          el('span', { class: 'muted-xs tabular', text: `${track.okCount}/${track.total} pillars steady` }),
         ]),
         el('p', { class: 'ontrack-summary', text: track.summary }),
       ]),
+      el('button', {
+        type: 'button',
+        class: `chip${state.recalOpen || state.recalReason ? ' active' : ''}`,
+        text: state.recalOpen ? 'Close Recalibrate' : 'Rough week? Recalibrate',
+        onClick: () => {
+          state.recalOpen = !state.recalOpen;
+          if (!state.recalOpen) state.recalReason = null;
+          redraw();
+        },
+      }),
     ]),
     el('div', { class: 'pillar-grid' }, track.pillars.map((p) => {
       const dotCls = p.status === 'ok' ? 'ok' : p.status === 'off' ? 'stop' : p.status === 'warn' ? 'warn' : 'info';
-      const barColor = p.status === 'ok' ? 'var(--green)' : p.status === 'off' ? 'var(--rose)' : 'var(--amber)';
+      const barColor = p.status === 'ok' ? 'var(--green)' : p.status === 'off' ? 'var(--rose)' : p.status === 'info' ? 'var(--cyan)' : 'var(--amber)';
       return el('div', { class: 'pillar-cell' }, [
         el('div', { class: 'pillar-top' }, [
           el('span', { text: p.name }),
@@ -347,7 +365,43 @@ export function renderTodayView(hub, state, redraw) {
         ]),
       ]);
     })),
-  ]));
+  ];
+
+  if (state.recalOpen) {
+    const drawer = el('div', { class: 'checkin-drawer' }, [
+      el('div', { class: 'muted-xs', text: 'What’s going on right now? Pick one for a guilt-free 3-day bounce-back plan:', style: { marginBottom: '10px' } }),
+      el('div', { class: 'chip-row' }, recalReasons.map((r) =>
+        el('button', {
+          type: 'button',
+          class: `chip${state.recalReason === r.id ? ' active' : ''}`,
+          text: r.label,
+          onClick: () => {
+            state.recalReason = r.id;
+            if (r.id === 'period') state.toggles.period = true;
+            if (r.id === 'ankle') state.toggles.ankle = true;
+            redraw();
+          },
+        }),
+      )),
+    ]);
+    if (activeRecal) {
+      drawer.appendChild(el('div', { class: 'detail-panel', style: { marginTop: '14px', borderLeft: '3px solid var(--green)' } }, [
+        el('strong', { text: activeRecal.title }),
+        el('div', { class: 'muted-xs', text: activeRecal.reassurance }),
+        el('div', { class: 'hairline-list', style: { marginTop: '6px' } }, activeRecal.days.map((d) =>
+          el('div', { class: 'hairline-row' }, [
+            el('div', {}, [
+              el('div', { class: 'row-title', text: `${d.day} · ${d.label}` }),
+              el('div', { class: 'row-sub', text: d.detail }),
+            ]),
+          ]),
+        )),
+      ]));
+    }
+    onTrackKids.push(drawer);
+  }
+
+  frag.appendChild(el('section', { class: 'ontrack-card' }, onTrackKids));
 
   // Section 2: 4 Core Biometric Strip (Ultrahuman style — restrained, clear deltas)
   const last14 = hub.ringList.slice(-14);

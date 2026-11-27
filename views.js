@@ -7,14 +7,14 @@
 
 import {
   addDays, allRaces, autoFallback, avg, daysBetween, exerciseHistory, footRuns, formatSet,
-  lastLoggedFor, latestRingWith, nextRace, onTrackScorecard, overloadNudge, planned,
-  prettyDate, pullUpProgress, readiness, recalibratePlan, recentWins, runnaProgress,
+  goalTrajectory, lastLoggedFor, latestRingWith, nextRace, onTrackScorecard, overloadNudge,
+  planned, prettyDate, pullUpProgress, readiness, recalibratePlan, recentWins, runnaProgress,
   runningPRs, sessionTotals, shoeMileage, shortMonth, sleepDebt7d, sleepSweetSpot,
   stepTarget, strengthPRWall, sum, trackedExercises, weekView, zone2Low, zone2Max,
-} from './plan.js?v=20261127i';
-import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127i';
-import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127i';
-import { CITIES } from './aqi.js?v=20261127i';
+} from './plan.js?v=20261127j';
+import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127j';
+import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127j';
+import { CITIES } from './aqi.js?v=20261127j';
 
 const fmt = (n, d = 1) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : n.toFixed(d));
 const fmtInt = (n) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : Math.round(n).toLocaleString());
@@ -195,6 +195,51 @@ export function renderTodayView(hub, state, redraw) {
       citySelect,
       locateBtn,
       aqiInLink,
+    ]),
+  ]));
+
+  // Overall Progress & Goal Trajectory Banner ("Are we going to hit our goal?")
+  const traj = goalTrajectory(hub, today, state.toggles);
+  frag.appendChild(el('section', { class: 'trajectory-card' }, [
+    el('div', { class: 'trajectory-top' }, [
+      el('div', { style: { minWidth: 0, flex: '1' } }, [
+        el('div', { class: 'card-title', text: 'Overall Progress · Goal Outlook' }),
+        el('h2', { class: 'trajectory-callout', text: traj.callout }),
+        el('p', { class: 'trajectory-forecast', text: traj.forecast }),
+      ]),
+      el('div', { class: `trajectory-score ${traj.tone}` }, [
+        el('span', { class: 'trajectory-score-num', text: `${traj.overallScore}%` }),
+        el('span', { class: 'trajectory-score-lbl', text: 'On-Goal' }),
+      ]),
+    ]),
+    el('div', { class: 'trajectory-bars' }, [
+      el('div', {}, [
+        el('div', { class: 'pillar-top' }, [
+          el('span', { text: `Plan Mileage (W1–W${traj.curWeek})` }),
+          el('span', { class: 'tabular', text: `${traj.actualSoFar} / ${traj.plannedSoFar} km` }),
+        ]),
+        el('div', { class: 'mini-bar', style: { marginTop: '6px' } }, [
+          el('div', { class: 'mini-bar-fill', style: { width: `${Math.max(4, traj.planPct)}%`, background: traj.planPct >= 75 ? 'var(--green)' : 'var(--cyan)' } }),
+        ]),
+      ]),
+      el('div', {}, [
+        el('div', { class: 'pillar-top' }, [
+          el('span', { text: 'Last 7-Day Momentum' }),
+          el('span', { class: 'tabular', text: `${traj.sessions7} sessions · ${traj.sleep7 ? traj.sleep7.toFixed(1) + 'h' : '—'} sleep` }),
+        ]),
+        el('div', { class: 'mini-bar', style: { marginTop: '6px' } }, [
+          el('div', { class: 'mini-bar-fill', style: { width: `${Math.max(4, traj.momentumPct)}%`, background: traj.momentumPct >= 70 ? 'var(--green)' : 'var(--amber)' } }),
+        ]),
+      ]),
+      el('div', {}, [
+        el('div', { class: 'pillar-top' }, [
+          el('span', { text: '10K Race Runway' }),
+          el('span', { class: 'tabular', text: `Longest ${traj.longestKm.toFixed(1)} / 10 km · ${traj.raceDays ?? '—'}d left` }),
+        ]),
+        el('div', { class: 'mini-bar', style: { marginTop: '6px' } }, [
+          el('div', { class: 'mini-bar-fill', style: { width: `${Math.max(4, traj.runwayPct)}%`, background: 'var(--indigo)' } }),
+        ]),
+      ]),
     ]),
   ]));
 

@@ -643,6 +643,88 @@ export function freshness(hub) {
   return { label: `Synced ${m[2]} ${day}`, stale: hours > STALE_HOURS };
 }
 
+// ---- Overall Goal Trajectory ("Are We Going to Hit Our Goal?") --------------
+
+export function goalTrajectory(hub, today, toggles = {}) {
+  const gentleMode = Boolean(toggles && (toggles.period || toggles.low));
+  const race = nextRace(hub, today);
+  const runna = runnaProgress(hub);
+  const wv = weekView(hub, today);
+  const curWeek = wv.weekNum || 1;
+
+  // 1. Overall Plan Adherence (W1..curWeek)
+  const weeksSoFar = runna.filter((w) => w.week <= curWeek);
+  const plannedSoFar = sum(weeksSoFar.map((w) => w.planned));
+  const actualSoFar = Math.round(sum(weeksSoFar.map((w) => w.actual)) * 10) / 10;
+  const planPct = plannedSoFar > 0 ? Math.min(100, Math.round((actualSoFar / plannedSoFar) * 100)) : 0;
+
+  // 2. Last 7-Day Momentum
+  const from7 = addDays(today, -6);
+  const runs7 = footRuns(hub).filter((r) => r.date >= from7 && r.date <= today);
+  const lifts7 = hub.sessions.filter((s) => s.date >= from7 && s.date <= today);
+  const sessions7 = runs7.length + lifts7.length;
+  const km7 = Math.round(sum(runs7.map((r) => r.km || 0)) * 10) / 10;
+  const ring7 = hub.ringList.filter((r) => r.date >= from7 && r.date <= today);
+  const sleep7 = avg(ring7.map((r) => r.sleep));
+  const steps7 = avg(ring7.filter((r) => r.steps !== null && r.steps > 0).map((r) => r.steps));
+  const sessScore = Math.min(100, (sessions7 / 4) * 100);
+  const sleepScore7 = sleep7 !== null ? Math.min(100, (sleep7 / 7.5) * 100) : 70;
+  const momentumPct = Math.round(sessScore * 0.6 + sleepScore7 * 0.4);
+
+  // 3. Race Runway (longest run vs 10 km + Z2 discipline)
+  const longest = footRuns(hub).reduce((best, r) => (r.km !== null && (!best || r.km > best.km) ? r : best), null);
+  const longestKm = longest ? longest.km : 0;
+  const runwayPct = Math.min(100, Math.round((longestKm / 10) * 100));
+
+  const overallScore = Math.round(planPct * 0.45 + momentumPct * 0.35 + runwayPct * 0.20);
+
+  let callout;
+  let tone;
+  let forecast;
+  const raceTag = race ? `${race.name} (${race.days}d away)` : 'your 10K goal';
+
+  if (gentleMode) {
+    callout = 'Rest up — you’re still totally fine for race day 🤍';
+    tone = 'ok';
+    forecast = `With ${race ? race.days : 90} days left to ${raceTag}, taking 2–3 recovery days for period/fatigue will NOT hurt your goal at all.`;
+  } else if (overallScore >= 80) {
+    callout = 'Girl, you are ON FIRE — you’re doing amazing 🔥';
+    tone = 'ok';
+    forecast = `At this exact rhythm (${actualSoFar}/${plannedSoFar} km logged + ${sessions7} sessions in 7d), you are going to crush ${raceTag}.`;
+  } else if (overallScore >= 62) {
+    callout = 'You’re fine, just relax — right on track ✨';
+    tone = 'ok';
+    forecast = `Solid foundation (${actualSoFar}/${plannedSoFar} km so far) and plenty of runway for ${raceTag}. Keep stacking easy Zone 2 runs and your 3 lifts.`;
+  } else if (overallScore >= 42) {
+    callout = 'Girl, we need to buckle up a bit 💪';
+    tone = 'warn';
+    forecast = `You’ll still be totally fine for ${raceTag} — no panic, just get ${wv.runsLeft || 2} easy Zone 2 runs + ${wv.gymLeft || 1} lift in before Sunday to lock momentum back in.`;
+  } else {
+    callout = 'Girl, we really need to buckle up 🚀';
+    tone = 'stop';
+    forecast = `Last 7 days dipped (${sessions7} sessions, ${km7} km). You still have ${race ? race.days : 90} days to ${raceTag}, so nothing is ruined — start with one easy 3 km run/walk or 25-min lift today.`;
+  }
+
+  return {
+    overallScore,
+    callout,
+    tone,
+    forecast,
+    curWeek,
+    actualSoFar,
+    plannedSoFar,
+    planPct,
+    sessions7,
+    km7,
+    sleep7,
+    steps7,
+    momentumPct,
+    longestKm,
+    runwayPct,
+    raceDays: race ? race.days : null,
+  };
+}
+
 // ---- "Are You On Track?" Live Coaching Scorecard ----------------------------
 
 export function onTrackScorecard(hub, today, toggles = {}) {

@@ -14,6 +14,38 @@ import {
 } from './views.js';
 
 const root = document.getElementById('app');
+const CACHE_KEY = 'fh_tab_cache_v1';
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30-minute tab-scoped TTL (no tokens ever stored)
+
+function saveTabCache(snap) {
+  try {
+    sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+      expiresAt: Date.now() + CACHE_TTL_MS,
+      snap,
+    }));
+  } catch {
+    // Ignore storage quota / private-mode errors
+  }
+}
+
+function loadTabCache() {
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.snap || typeof parsed.expiresAt !== 'number' || Date.now() > parsed.expiresAt) {
+      sessionStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    return parsed.snap;
+  } catch {
+    return null;
+  }
+}
+
+function clearTabCache() {
+  try { sessionStorage.removeItem(CACHE_KEY); } catch {}
+}
 
 const state = {
   tab: 'today',
@@ -65,6 +97,7 @@ async function handleSignIn(promptMode = '') {
   try {
     await signInWithGoogle(promptMode);
     const snap = await fetchLiveSheetSnapshot();
+    saveTabCache(snap);
     hub = buildHub(snap);
     state.today = todayIST();
     state.mode = 'ready';
@@ -81,6 +114,7 @@ async function handleSignIn(promptMode = '') {
 
 function handleSignOut() {
   signOutGoogle();
+  clearTabCache();
   hub = null;
   state.authError = '';
   state.mode = 'auth';
@@ -93,8 +127,12 @@ async function handleRefresh() {
   state.refreshNote = 'Syncing Sheet…';
   render();
   try {
-    if (isOAuthConfigured() && isSignedIn()) {
+    if (isOAuthConfigured()) {
+      if (!isSignedIn()) {
+        await signInWithGoogle('select_account');
+      }
       const snap = await fetchLiveSheetSnapshot();
+      saveTabCache(snap);
       hub = buildHub(snap);
       state.today = todayIST();
       state.refreshNote = 'Updated just now';
@@ -162,7 +200,7 @@ function render() {
 
   const fresh = freshness(hub);
   const race = nextRace(hub, state.today);
-  const showLogout = isOAuthConfigured() && isSignedIn();
+  const showLogout = isOAuthConfigured() && (isSignedIn() || Boolean(loadTabCache()));
 
   const navItems = [
     { id: 'today', label: 'Today', ico: 'today', badge: null },
@@ -289,6 +327,14 @@ function render() {
 async function boot() {
   applyTheme();
   if (isOAuthConfigured()) {
+    const cached = loadTabCache();
+    if (cached) {
+      hub = buildHub(cached);
+      state.today = todayIST();
+      state.mode = 'ready';
+      render();
+      return;
+    }
     state.mode = 'auth';
     render();
     return;

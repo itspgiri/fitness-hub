@@ -487,8 +487,18 @@ function strain(hub, d) {
   return { hotHr: hot.length ? Math.round(Math.max(...hot)) : null, late, any: hot.length > 0 || late };
 }
 
+export function latestRingWith(hub, field) {
+  for (let i = hub.ringList.length - 1; i >= 0; i--) {
+    const r = hub.ringList[i];
+    if (r[field] !== null && r[field] !== undefined && r[field] !== '' && r[field] !== 0) return r;
+  }
+  return hub.ringList[hub.ringList.length - 1] || {};
+}
+
 export function readiness(hub, today, dayType, toggles) {
-  const row = hub.ring.get(today) || hub.ringList[hub.ringList.length - 1];
+  const todayRow = hub.ring.get(today) || null;
+  const hasTodaySleep = Boolean(todayRow && todayRow.sleep !== null && todayRow.sleep > 0);
+  const row = hasTodaySleep ? todayRow : latestRingWith(hub, 'sleep');
   const sleep = row ? row.sleep : null;
   if (sleep === null || sleep <= 0) return { level: 'none', headline: 'No sleep data yet', text: 'Sync Ultrahuman Ring to see today’s readiness.' };
 
@@ -496,7 +506,9 @@ export function readiness(hub, today, dayType, toggles) {
   const y2 = strain(hub, addDays(today, -2));
   const short = sleep < SLEEP_SHORT_HOURS;
 
-  const parts = [`Slept ${sleep.toFixed(1)} h` + (row.sleepScore ? ` (Score ${row.sleepScore})` : '') + (short ? ` — under ${SLEEP_SHORT_HOURS} h` : '') + '.'];
+  const whenPrefix = hasTodaySleep ? 'Slept ' : `Latest synced sleep (${prettyDate(row.date, false)}): `;
+  const parts = [`${whenPrefix}${sleep.toFixed(1)} h` + (row.sleepScore ? ` (Score ${row.sleepScore})` : '') + (short ? ` — under ${SLEEP_SHORT_HOURS} h` : '') + '.'];
+  if (!hasTodaySleep) parts.push('Today’s Ring sleep hasn’t synced to your Sheet yet.');
   if (row.recovery) parts.push(`Recovery ${row.recovery}/100.`);
   if (y.hotHr !== null) parts.push(`Yesterday’s run averaged ${y.hotHr} bpm (above Z2 cap ${zone2Max(hub)}).`);
   if (y.late) parts.push('Yesterday’s workout finished after 8 pm.');
@@ -510,7 +522,7 @@ export function readiness(hub, today, dayType, toggles) {
   else if (y.any && y2.any) { headline = 'Two hot/late days — consider swapping'; level = 'swap'; }
   else { headline = flagged ? 'Dial intensity back — keep it easy' : 'Green light — train as planned'; }
 
-  return { level, headline, text: parts.join(' ') };
+  return { level, headline, text: parts.join(' '), hasTodaySleep };
 }
 
 // ---- week -------------------------------------------------------------------

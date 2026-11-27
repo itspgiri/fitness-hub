@@ -7,7 +7,7 @@
 
 import {
   addDays, allRaces, avg, daysBetween, exerciseHistory, footRuns, formatSet, lastLoggedFor,
-  nextRace, planned, prettyDate, pullUpProgress, readiness, recentWins,
+  latestRingWith, nextRace, planned, prettyDate, pullUpProgress, readiness, recentWins,
   runnaProgress, sessionTotals, shoeMileage, shortMonth, stepTarget, sum,
   trackedExercises, weekView, zone2Low, zone2Max,
 } from './plan.js';
@@ -35,9 +35,32 @@ export function renderTodayView(hub, state, redraw) {
   const selectedDay = state.selectedDay || today;
   const planDay = planned(hub, selectedDay);
   const wv = weekView(hub, today);
-  const latestRing = hub.ring.get(today) || hub.ringList[hub.ringList.length - 1] || {};
-  const prevRing = hub.ring.get(addDays(today, -1)) || hub.ringList[hub.ringList.length - 2] || {};
-  const roll7 = hub.daily.get(today) || hub.daily.get(latestRing.date) || {};
+  const todayRing = hub.ring.get(today) || hub.ringList[hub.ringList.length - 1] || {};
+  const sleepRing = (todayRing.sleep !== null && todayRing.sleep > 0) ? todayRing : latestRingWith(hub, 'sleep');
+  const recRing = (todayRing.recovery !== null && todayRing.recovery > 0) ? todayRing : latestRingWith(hub, 'recovery');
+  const hrvRing = (todayRing.hrv !== null && todayRing.hrv > 0) ? todayRing : latestRingWith(hub, 'hrv');
+  const rhrRing = (todayRing.rhr !== null && todayRing.rhr > 0) ? todayRing : latestRingWith(hub, 'rhr');
+  const tempRing = (todayRing.skinTemp !== null && todayRing.skinTemp > 0) ? todayRing : latestRingWith(hub, 'skinTemp');
+  const stepsRing = (todayRing.steps !== null && todayRing.steps >= 500) ? todayRing : latestRingWith(hub, 'steps');
+  const latestRing = {
+    ...sleepRing,
+    recovery: recRing.recovery ?? sleepRing.recovery ?? null,
+    hrv: hrvRing.hrv ?? null,
+    minHrv: hrvRing.minHrv ?? null,
+    maxHrv: hrvRing.maxHrv ?? null,
+    rhr: rhrRing.rhr ?? null,
+    minHr: rhrRing.minHr ?? null,
+    skinTemp: tempRing.skinTemp ?? null,
+    vo2Max: todayRing.vo2Max ?? sleepRing.vo2Max ?? null,
+    movement: todayRing.movement ?? sleepRing.movement ?? null,
+    steps: todayRing.steps ?? null,
+    date: todayRing.date || sleepRing.date,
+  };
+  const sleepIsPrev = sleepRing.date && sleepRing.date !== today;
+  const recIsPrev = recRing.date && recRing.date !== today;
+  const stepsIsPrev = stepsRing.date && stepsRing.date !== today;
+  const prevRing = stepsRing;
+  const roll7 = hub.daily.get(today) || hub.daily.get(sleepRing.date) || {};
   const rdy = readiness(hub, today, planDay.type, state.toggles);
   const sTarget = stepTarget(hub);
   const z2Lo = zone2Low(hub);
@@ -199,7 +222,7 @@ export function renderTodayView(hub, state, redraw) {
           displayValue: latestRing.recovery !== null ? `${Math.round(latestRing.recovery)}%` : '—',
           sublabel: '/ 100',
         }),
-        el('span', { class: 'ring-caption', text: 'Recovery' }),
+        el('span', { class: 'ring-caption', text: recIsPrev ? `Recovery · ${prettyDate(recRing.date, false)}` : 'Recovery' }),
       ]),
       el('div', { class: 'ring-box' }, [
         radialRing({
@@ -209,7 +232,7 @@ export function renderTodayView(hub, state, redraw) {
           displayValue: latestRing.sleepScore !== null ? String(Math.round(latestRing.sleepScore)) : '—',
           sublabel: latestRing.sleep ? `${latestRing.sleep.toFixed(1)}h` : '',
         }),
-        el('span', { class: 'ring-caption', text: 'Sleep' }),
+        el('span', { class: 'ring-caption', text: sleepIsPrev ? `Sleep · ${prettyDate(sleepRing.date, false)}` : 'Sleep' }),
       ]),
       el('div', { class: 'ring-box' }, [
         radialRing({
@@ -219,7 +242,7 @@ export function renderTodayView(hub, state, redraw) {
           displayValue: displaySteps >= 1000 ? `${(displaySteps / 1000).toFixed(1)}k` : String(displaySteps),
           sublabel: `/ ${(sTarget / 1000).toFixed(1)}k`,
         }),
-        el('span', { class: 'ring-caption', text: stepsLabel }),
+        el('span', { class: 'ring-caption', text: stepsIsPrev ? `Steps · ${prettyDate(stepsRing.date, false)}` : 'Steps' }),
       ]),
     ]),
     el('div', { class: 'hero-brief' }, heroBriefKids),

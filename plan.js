@@ -758,7 +758,7 @@ export function goalTrajectory(hub, today, toggles = {}) {
     tone = 'warn';
     forecast = `You’re dipping into the 60–79% zone. You’ll still hit ${raceTag} if you lock in ${wv.runsLeft || 2} easy runs + ${wv.gymLeft || 1} lift before Sunday.`;
   } else {
-    callout = 'Girl, we really need to buckle up 🚀';
+    callout = 'Girl, you really REALLY need to get your ass up 🚀';
     tone = 'stop';
     forecast = `Below 60% right now (${actualToDate}/${plannedToDate} km · ${sessions7} sessions in 7d). Stop skipping — get one easy 3 km run or 25-min lift on the board TODAY so ${raceTag} stays on track.`;
   }

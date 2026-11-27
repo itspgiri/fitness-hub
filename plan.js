@@ -636,3 +636,287 @@ export function freshness(hub) {
   const day = m[1] === todayIST() ? 'today' : prettyDate(m[1], false);
   return { label: `Synced ${m[2]} ${day}`, stale: hours > STALE_HOURS };
 }
+
+// ---- "Are You On Track?" Live Coaching Scorecard ----------------------------
+
+export function onTrackScorecard(hub, today) {
+  const wv = weekView(hub, today);
+  const sTarget = stepTarget(hub);
+  const z2Hi = zone2Max(hub);
+  const last7Ring = hub.ringList.slice(-7);
+  const last14Ring = hub.ringList.slice(-14);
+
+  // 1. Sleep (7d avg vs 7.5h floor / 8h goal)
+  const sleep7 = avg(last7Ring.map((r) => r.sleep));
+  const sleepStatus = sleep7 === null ? 'info' : sleep7 >= 7.5 ? 'ok' : sleep7 >= 6.8 ? 'warn' : 'off';
+
+  // 2. Weekly Runs (Runna progress vs elapsed days of week)
+  const dow = (toDate(today).getUTCDay() + 6) % 7; // Mon=0..Sun=6
+  const runPct = wv.weekKm ? (wv.runKm / wv.weekKm) * 100 : 0;
+  const expectedRunPct = dow >= 5 ? 60 : dow >= 2 ? 25 : 0;
+  const runStatus = wv.weekKm ? (runPct >= 85 || runPct >= expectedRunPct ? 'ok' : dow >= 3 ? 'warn' : 'ok') : 'info';
+
+  // 3. Weekly Strength (Gym sessions vs 3/wk)
+  const gymPct = wv.gymPlanned ? (wv.gymDone / wv.gymPlanned) * 100 : 0;
+  const expectedGym = dow >= 5 ? 2 : dow >= 2 ? 1 : 0;
+  const gymStatus = wv.gymDone >= wv.gymPlanned ? 'ok' : wv.gymDone >= expectedGym ? 'ok' : 'warn';
+
+  // 4. Daily Steps consistency (14d >= 7,500)
+  const stepDays = last14Ring.filter((r) => r.steps !== null && r.steps > 0);
+  const stepHit = stepDays.length ? Math.round((stepDays.filter((r) => r.steps >= sTarget).length / stepDays.length) * 100) : null;
+  const stepStatus = stepHit === null ? 'info' : stepHit >= 65 ? 'ok' : stepHit >= 40 ? 'warn' : 'off';
+
+  // 5. Zone 2 Aerobic Discipline (last 5 runs with HR)
+  const recentHrRuns = footRuns(hub).filter((r) => r.avgHr !== null).slice(0, 5);
+  const avgRecentHr = avg(recentHrRuns.map((r) => r.avgHr));
+  const z2Status = avgRecentHr === null ? 'info' : avgRecentHr <= z2Hi ? 'ok' : avgRecentHr <= z2Hi + 10 ? 'warn' : 'off';
+
+  const pillars = [
+    {
+      name: 'Sleep (7d)',
+      value: sleep7 !== null ? `${sleep7.toFixed(1)}h avg` : '—',
+      target: 'Goal 7.5–8.0h',
+      status: sleepStatus,
+      pct: sleep7 !== null ? Math.min(100, (sleep7 / 8) * 100) : 0,
+    },
+    {
+      name: `Runs (W${wv.weekNum ?? ''})`,
+      value: `${wv.runKm} / ${wv.weekKm ?? '—'} km`,
+      target: wv.runsLeft > 0 ? `${wv.runsLeft} run${wv.runsLeft === 1 ? '' : 's'} left` : 'Target hit',
+      status: runStatus,
+      pct: Math.min(100, runPct),
+    },
+    {
+      name: 'Strength',
+      value: `${wv.gymDone} / ${wv.gymPlanned} lifts`,
+      target: wv.gymLeft > 0 ? `${wv.gymLeft} left this week` : 'Target hit',
+      status: gymStatus,
+      pct: Math.min(100, gymPct),
+    },
+    {
+      name: 'Steps (14d)',
+      value: stepHit !== null ? `${stepHit}% days` : '—',
+      target: `Floor ${sTarget.toLocaleString()}/d`,
+      status: stepStatus,
+      pct: stepHit ?? 0,
+    },
+    {
+      name: 'Zone 2 HR',
+      value: avgRecentHr !== null ? `${Math.round(avgRecentHr)} bpm` : '—',
+      target: `Cap ≤ ${z2Hi} bpm`,
+      status: z2Status,
+      pct: avgRecentHr !== null ? Math.min(100, (z2Hi / avgRecentHr) * 100) : 0,
+    },
+  ];
+
+  const scored = pillars.filter((p) => p.status !== 'info');
+  const okCount = scored.filter((p) => p.status === 'ok').length;
+  const scorePct = scored.length ? Math.round((okCount / scored.length) * 100) : 0;
+
+  let verdict = 'On Track';
+  let tone = 'ok';
+  if (scorePct < 50) { verdict = 'Needs Reset'; tone = 'warn'; }
+  else if (scorePct < 80) { verdict = 'Mostly On Track'; tone = 'warn'; }
+
+  const strengths = pillars.filter((p) => p.status === 'ok').map((p) => p.name);
+  const focus = pillars.find((p) => p.status === 'off') || pillars.find((p) => p.status === 'warn');
+  const summary = focus
+    ? `${okCount}/${scored.length} pillars green${strengths.length ? ` (${strengths.slice(0, 2).join(' & ')} strong)` : ''}. Next focus: ${focus.name} (${focus.value} vs ${focus.target}).`
+    : `All ${okCount}/${scored.length} pillars green — keep this exact rhythm going.`;
+
+  return { verdict, tone, scorePct, okCount, total: scored.length, summary, pillars };
+}
+
+// ---- Smart Auto-Fallback Coach ----------------------------------------------
+
+export function autoFallback(hub, today, planDay, toggles) {
+  const todayRing = hub.ring.get(today) || {};
+  const sleepRing = (todayRing.sleep !== null && todayRing.sleep > 0) ? todayRing : latestRingWith(hub, 'sleep');
+  const hrvRing = (todayRing.hrv !== null && todayRing.hrv > 0) ? todayRing : latestRingWith(hub, 'hrv');
+  const rhrRing = (todayRing.rhr !== null && todayRing.rhr > 0) ? todayRing : latestRingWith(hub, 'rhr');
+  const tempRing = (todayRing.skinTemp !== null && todayRing.skinTemp > 0) ? todayRing : latestRingWith(hub, 'skinTemp');
+  const roll7 = hub.daily.get(today) || hub.daily.get(sleepRing.date) || {};
+  const last7Temp = avg(hub.ringList.slice(-8, -1).map((r) => r.skinTemp));
+
+  const triggers = [];
+  if (toggles && toggles.ankle) triggers.push({ key: 'ankle', label: 'Ankle swollen (hard stop on running)', severity: 'stop' });
+  if (sleepRing.sleep !== null && sleepRing.sleep < SLEEP_SHORT_HOURS) {
+    triggers.push({ key: 'sleep', label: `Short sleep (${sleepRing.sleep.toFixed(1)}h < ${SLEEP_SHORT_HOURS}h)`, severity: 'warn' });
+  }
+  if (hrvRing.hrv !== null && roll7.roll7Hrv && hrvRing.hrv < roll7.roll7Hrv * 0.85) {
+    triggers.push({ key: 'hrv', label: `HRV dip (${Math.round(hrvRing.hrv)} ms vs ${Math.round(roll7.roll7Hrv)} ms 7d avg)`, severity: 'warn' });
+  }
+  if (rhrRing.rhr !== null && roll7.roll7Rhr && rhrRing.rhr >= roll7.roll7Rhr + 4) {
+    triggers.push({ key: 'rhr', label: `Elevated RHR (${Math.round(rhrRing.rhr)} bpm vs ${Math.round(roll7.roll7Rhr)} bpm avg)`, severity: 'warn' });
+  }
+  if (tempRing.skinTemp !== null && last7Temp !== null && tempRing.skinTemp >= last7Temp + 0.4) {
+    triggers.push({ key: 'temp', label: `Skin temp +${(tempRing.skinTemp - last7Temp).toFixed(2)} °C above baseline`, severity: 'warn' });
+  }
+  if (toggles && toggles.period) triggers.push({ key: 'period', label: 'Period — go by feel', severity: 'warn' });
+  if (toggles && toggles.low) triggers.push({ key: 'low', label: 'Low energy check-in', severity: 'warn' });
+  if (toggles && toggles.short) triggers.push({ key: 'short', label: 'Short on time (25-min Express)', severity: 'info' });
+  if (toggles && toggles.late) triggers.push({ key: 'late', label: 'After 7:30 pm (8 pm sleep cutoff)', severity: 'warn' });
+
+  if (!triggers.length) return { active: false, triggers: [], headline: '', actions: [], expressGym: false };
+
+  const hasStop = triggers.some((t) => t.key === 'ankle');
+  const hasLate = triggers.some((t) => t.key === 'late');
+  const hasShort = triggers.some((t) => t.key === 'short' || t.key === 'low');
+  const z2Hi = zone2Max(hub);
+
+  let headline = 'Modified Fallback Plan Active';
+  const actions = [];
+  let expressGym = false;
+
+  if (planDay.type === 'run') {
+    if (hasStop) {
+      headline = 'Swap Run → Mobility or Upper Body';
+      actions.push('Zero running until ankle swelling is 100% gone.');
+      actions.push('Optional: 20 min core/upper-body or pure rest + elevation.');
+    } else if (hasLate) {
+      headline = 'Protect Tonight’s Sleep — Easy Walk Only';
+      actions.push('Skip hard cardio after 8:00 pm; do a 20-min easy walk + stretch.');
+    } else {
+      const capKm = planDay.km ? Math.max(2, Math.round(planDay.km * 0.65 * 2) / 2) : 2.5;
+      headline = `Easy Fallback Run — ${capKm} km @ ≤ ${z2Hi - 8} bpm`;
+      actions.push(`Cap distance at ~${capKm} km (or 20 min easy run/walk) instead of ${planDay.km || 'full'} km.`);
+      actions.push(`Lower HR ceiling to ≤ ${z2Hi - 8} bpm — take walk breaks early.`);
+    }
+  } else if (planDay.type === 'gym') {
+    if (hasLate) {
+      headline = 'Light Mobility Only (Past 8 pm Cutoff)';
+      actions.push('Skip heavy lifting late at night so HR drops before sleep.');
+    } else if (hasShort) {
+      headline = '25-Min Express Gym (Top 3 Lifts Only)';
+      expressGym = true;
+      actions.push('Hit only the first 3 compound lifts (2 working sets each) — accessories optional.');
+      actions.push('Hold last session’s weights; focus on crisp form.');
+    } else {
+      headline = 'Recovery-Adjusted Gym (-1 Set, Hold Weights)';
+      actions.push('Drop 1 working set per exercise (2 sets instead of 3).');
+      actions.push('Hold last session’s weights — save PR attempts for a green recovery day.');
+    }
+  } else {
+    headline = 'Rest Day — Prioritize Recovery';
+    actions.push('Aim for early bed (< 12:30 am), hydration, and easy walking.');
+  }
+
+  return { active: true, triggers, headline, actions, expressGym };
+}
+
+// ---- Personal Sleep Sweet-Spot & 7-Day Sleep Debt ---------------------------
+
+function bedtimeHoursFromMidnight(bt) {
+  if (!bt) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(bt).trim());
+  if (!m) return null;
+  const h = Number(m[1]) + Number(m[2]) / 60;
+  // Normalize 19:00..23:59 as -5..0 and 00:00..06:00 as 0..6
+  return h >= 18 ? h - 24 : h;
+}
+
+export function sleepSweetSpot(hub) {
+  const buckets = [
+    { id: 'early', label: 'Before 1:00 am', rows: [] },
+    { id: 'mid', label: '1:00 – 2:00 am', rows: [] },
+    { id: 'late', label: 'After 2:00 am', rows: [] },
+  ];
+  hub.ringList.forEach((r) => {
+    const rel = bedtimeHoursFromMidnight(r.bedtime);
+    if (rel === null || r.sleepScore === null) return;
+    if (rel < 1.0) buckets[0].rows.push(r);
+    else if (rel < 2.0) buckets[1].rows.push(r);
+    else buckets[2].rows.push(r);
+  });
+  return buckets.map((b) => ({
+    id: b.id,
+    label: b.label,
+    nights: b.rows.length,
+    avgScore: avg(b.rows.map((r) => r.sleepScore)),
+    avgSleep: avg(b.rows.map((r) => r.sleep)),
+    avgHrv: avg(b.rows.map((r) => r.hrv)),
+  }));
+}
+
+export function sleepDebt7d(hub) {
+  const valid = hub.ringList.filter((r) => r.sleep !== null && r.sleep > 0).slice(-7);
+  if (!valid.length) return { nights: 0, debtHr: null, avgHr: null };
+  const totalActual = sum(valid.map((r) => r.sleep));
+  const targetTotal = valid.length * SLEEP_TARGET_HOURS;
+  return {
+    nights: valid.length,
+    debtHr: Math.round((targetTotal - totalActual) * 10) / 10, // positive = debt, negative = surplus
+    avgHr: Math.round((totalActual / valid.length) * 100) / 100,
+  };
+}
+
+// ---- Running PRs (Best Efforts) & 10K Readiness -----------------------------
+
+function parseClockToSec(t) {
+  if (!t) return null;
+  const parts = String(t).trim().split(':').map(Number);
+  if (parts.some((x) => !Number.isFinite(x))) return null;
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  return null;
+}
+
+export function runningPRs(hub) {
+  const wanted = ['1K', '1 mile', '2 mile', '5K', '10K'];
+  const best = new Map();
+  footRuns(hub).forEach((r) => {
+    if (!r.bestEfforts) return;
+    r.bestEfforts.split('|').forEach((chunk) => {
+      const idx = chunk.indexOf(':');
+      if (idx < 0) return;
+      const dist = chunk.slice(0, idx).trim();
+      const timeStr = chunk.slice(idx + 1).trim();
+      if (!wanted.includes(dist)) return;
+      const sec = parseClockToSec(timeStr);
+      if (sec === null) return;
+      const prev = best.get(dist);
+      if (!prev || sec < prev.sec) best.set(dist, { dist, time: timeStr, sec, date: r.date });
+    });
+  });
+  return wanted.map((d) => best.get(d)).filter(Boolean);
+}
+
+// ---- Strength PR Wall & Progressive Overload Nudges -------------------------
+
+export function strengthPRWall(hub) {
+  const list = trackedExercises(hub).slice(0, 8);
+  return list.map((ex) => {
+    const hist = exerciseHistory(hub, ex.name);
+    if (!hist.points.length) return null;
+    const bestPt = hist.points.reduce((best, p) => {
+      if (!best) return p;
+      const better = hist.inverted ? p.kg < best.kg : p.kg > best.kg;
+      return better || (p.kg === best.kg && (p.reps || 0) > (best.reps || 0)) ? p : best;
+    }, null);
+    const max1rm = Math.max(...hist.points.map((p) => p.est1rm || 0));
+    return {
+      name: ex.name,
+      inverted: hist.inverted,
+      sessions: ex.count,
+      bestKg: bestPt.kg,
+      bestReps: bestPt.reps,
+      bestDate: bestPt.date,
+      est1rm: !hist.inverted && max1rm > 0 ? max1rm : null,
+    };
+  }).filter(Boolean);
+}
+
+export function overloadNudge(last) {
+  if (!last || !last.top || last.top.kg === null || last.top.kg <= 0) return null;
+  const { kg, reps } = last.top;
+  if (last.inverted) {
+    const nextKg = Math.max(0, kg - 2);
+    return reps !== null && reps >= 6 ? `Try ${nextKg} kg assist` : `Aim ${kg} kg × ${(reps || 5) + 1}`;
+  }
+  if (reps !== null && reps >= 12) {
+    const inc = kg >= 20 ? 2.5 : 1;
+    return `Try ${kg + inc} kg × 8–10`;
+  }
+  if (reps !== null) return `Aim ${kg} kg × ${reps + 1}`;
+  return null;
+}

@@ -1,18 +1,18 @@
 // Main application shell: supports live Google Sheets OAuth (GitHub Pages)
 // and local snapshot preview (localhost). Zero innerHTML, strict CSP-compliant.
 
-import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127e';
-import { icon } from './charts.js?v=20261127e';
-import { el } from './ui.js?v=20261127e';
-import { fetchLiveAqi, fetchLiveAqiCoords, locateBrowserCoords } from './aqi.js?v=20261127e';
+import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127f';
+import { icon } from './charts.js?v=20261127f';
+import { el } from './ui.js?v=20261127f';
+import { fetchLiveAqi, fetchLiveAqiCoords, locateBrowserCoords } from './aqi.js?v=20261127f';
 import {
   fetchLiveSheetSnapshot, isLocalPreviewHost, isOAuthConfigured,
   isSignedIn, signInWithGoogle, signOutGoogle,
-} from './sheets.js?v=20261127e';
+} from './sheets.js?v=20261127f';
 import {
   renderMonthlyView, renderRunningView, renderSleepView,
   renderStrengthView, renderTodayView,
-} from './views.js?v=20261127e';
+} from './views.js?v=20261127f';
 
 const root = document.getElementById('app');
 const CACHE_KEY = 'fh_tab_cache_v1';
@@ -373,8 +373,9 @@ function render() {
 
 async function boot() {
   applyTheme();
-  refreshAqi(state.aqiCity);
-  if (isOAuthConfigured()) {
+  const forceLocal = isLocalPreviewHost() && new URLSearchParams(window.location.search).get('preview') === 'local';
+  if (isOAuthConfigured() && !forceLocal) {
+    refreshAqi(state.aqiCity);
     const cached = loadTabCache();
     if (cached) {
       hub = buildHub(cached);

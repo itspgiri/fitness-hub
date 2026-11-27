@@ -196,7 +196,7 @@ export function lineChart({
     }));
     if (band.label) {
       svg.appendChild(svgEl('text', {
-        x: width - pad.right - 6, y: yTop + 13, 'text-anchor': 'end',
+        x: pad.left + 8, y: yTop + 13, 'text-anchor': 'start',
         class: 'chart-band-label', fill: band.color || '#22c55e',
       }, [band.label]));
     }
@@ -211,7 +211,7 @@ export function lineChart({
     }));
     if (targetLine.label) {
       svg.appendChild(svgEl('text', {
-        x: width - pad.right - 4, y: ty - 5, 'text-anchor': 'end',
+        x: pad.left + 6, y: ty - 5, 'text-anchor': 'start',
         class: 'chart-band-label', fill: targetLine.color || '#22c55e',
       }, [targetLine.label]));
     }
@@ -371,7 +371,7 @@ export function barChart({
     }));
     if (targetLine.label) {
       svg.appendChild(svgEl('text', {
-        x: width - pad.right - 4, y: ty - 5, 'text-anchor': 'end',
+        x: pad.left + 6, y: ty - 5, 'text-anchor': 'start',
         class: 'chart-band-label', fill: targetLine.color || '#22c55e',
       }, [targetLine.label]));
     }

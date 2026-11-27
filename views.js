@@ -11,10 +11,10 @@ import {
   prettyDate, pullUpProgress, readiness, recalibratePlan, recentWins, runnaProgress,
   runningPRs, sessionTotals, shoeMileage, shortMonth, sleepDebt7d, sleepSweetSpot,
   stepTarget, strengthPRWall, sum, trackedExercises, weekView, zone2Low, zone2Max,
-} from './plan.js?v=20261127h';
-import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127h';
-import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127h';
-import { CITIES } from './aqi.js?v=20261127h';
+} from './plan.js?v=20261127i';
+import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127i';
+import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127i';
+import { CITIES } from './aqi.js?v=20261127i';
 
 const fmt = (n, d = 1) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : n.toFixed(d));
 const fmtInt = (n) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : Math.round(n).toLocaleString());
@@ -70,6 +70,8 @@ export function renderTodayView(hub, state, redraw) {
   const race = nextRace(hub, today);
 
   const activeToggleCount = ['ankle', 'period', 'low', 'short', 'late'].filter((k) => state.toggles[k]).length;
+  const fbNow = autoFallback(hub, today, planDay, state.toggles);
+  const showFeelGoodBtn = activeToggleCount > 0 || state.recalOpen || Boolean(state.recalReason) || fbNow.active || state.toggles.feelGood;
 
   // Build race countdown slide pill (real % elapsed from Runna W1 start to race date)
   let raceSlideEl = null;
@@ -99,10 +101,10 @@ export function renderTodayView(hub, state, redraw) {
     ]),
     el('div', { class: 'chip-row' }, [
       raceSlideEl,
-      el('button', {
+      showFeelGoodBtn ? el('button', {
         type: 'button',
         class: `chip${state.toggles.feelGood ? ' active' : ''}`,
-        text: state.toggles.feelGood ? '✓ I feel good' : 'I feel good',
+        text: state.toggles.feelGood ? '✓ Back on plan' : 'I feel good — back to plan',
         onClick: () => {
           const next = !state.toggles.feelGood;
           state.toggles.feelGood = next;
@@ -117,7 +119,7 @@ export function renderTodayView(hub, state, redraw) {
           }
           redraw();
         },
-      }),
+      }) : null,
       el('button', {
         type: 'button',
         class: `chip${state.checkinOpen || activeToggleCount ? ' active' : ''}`,
@@ -196,79 +198,10 @@ export function renderTodayView(hub, state, redraw) {
     ]),
   ]));
 
-  // Front Current Status Bar (at-a-glance athlete posture)
-  const runsList = footRuns(hub);
-  const lastRun = runsList[0] || null;
-  const sleepPct = latestRing.sleep ? Math.min(100, (latestRing.sleep / 8) * 100) : 0;
-  const runPct = wv.weekKm ? Math.min(100, (wv.runKm / wv.weekKm) * 100) : 0;
-  const gymPct = wv.gymPlanned ? Math.min(100, (wv.gymDone / wv.gymPlanned) * 100) : 0;
-  const recVal = latestRing.recovery ?? 0;
-  const statusLabel = rdy.level === 'stop' ? 'Ankle Stop'
-    : rdy.level === 'ok' ? 'Green Light'
-      : rdy.level === 'swap' ? 'Swap / Easy'
-        : 'Easy / Pace';
-  const statusTone = rdy.level === 'stop' ? 'stop' : rdy.level === 'ok' ? 'ok' : 'warn';
-  const statusColor = statusTone === 'ok' ? 'var(--green)' : statusTone === 'stop' ? 'var(--rose)' : 'var(--amber)';
-
-  const statusCell = ({ k, v, sub, pct, color, dot }) => el('div', { class: 'status-cell' }, [
-    el('div', { class: 'status-cell-k' }, [
-      el('span', { text: k }),
-      el('span', { class: `status-dot ${dot}` }),
-    ]),
-    el('div', { class: 'status-cell-v', text: v }),
-    el('div', { class: 'status-cell-sub', text: sub }),
-    el('div', { class: 'mini-bar' }, [
-      el('div', { class: 'mini-bar-fill', style: { width: `${Math.max(4, Math.min(100, pct)).toFixed(0)}%`, background: color } }),
-    ]),
-  ]);
-
-  frag.appendChild(el('section', { class: 'status-bar' }, [
-    statusCell({
-      k: 'Current Status',
-      v: statusLabel,
-      sub: recVal ? `Recovery ${Math.round(recVal)}/100 · ${planDay.session}` : planDay.session,
-      pct: recVal || 50,
-      color: statusColor,
-      dot: statusTone,
-    }),
-    statusCell({
-      k: 'Sleep Target',
-      v: latestRing.sleep ? `${latestRing.sleep.toFixed(2)} / 8.0h` : '—',
-      sub: `Score ${latestRing.sleepScore ?? '—'} · Eff ${latestRing.efficiency ?? '—'}%`,
-      pct: sleepPct,
-      color: sleepPct >= 95 ? 'var(--green)' : 'var(--indigo)',
-      dot: sleepPct >= 95 ? 'ok' : 'info',
-    }),
-    statusCell({
-      k: `Week ${wv.weekNum ?? ''} Runs`,
-      v: `${wv.runKm} / ${wv.weekKm ?? '—'} km`,
-      sub: wv.runsLeft > 0 ? `${wv.runsLeft} run${wv.runsLeft === 1 ? '' : 's'} left this week` : 'Weekly run goal hit',
-      pct: runPct,
-      color: runPct >= 100 ? 'var(--green)' : 'var(--cyan)',
-      dot: runPct >= 100 ? 'ok' : 'info',
-    }),
-    statusCell({
-      k: 'Week Strength',
-      v: `${wv.gymDone} / ${wv.gymPlanned} sessions`,
-      sub: wv.gymLeft > 0 ? `${wv.gymLeft} lift${wv.gymLeft === 1 ? '' : 's'} remaining` : 'Weekly strength hit',
-      pct: gymPct,
-      color: gymPct >= 100 ? 'var(--green)' : 'var(--amber)',
-      dot: gymPct >= 100 ? 'ok' : 'warn',
-    }),
-    statusCell({
-      k: 'Aerobic Cap',
-      v: lastRun && lastRun.avgHr ? `${Math.round(lastRun.avgHr)} bpm last` : `≤ ${z2Hi} bpm`,
-      sub: lastRun ? `${lastRun.km} km on ${prettyDate(lastRun.date, false)} · Z2 ≤ ${z2Hi}` : `Zone 2 ${z2Lo}–${z2Hi} bpm`,
-      pct: lastRun && lastRun.avgHr ? Math.min(100, (z2Hi / lastRun.avgHr) * 100) : 70,
-      color: lastRun && lastRun.avgHr && lastRun.avgHr <= z2Hi ? 'var(--green)' : 'var(--amber)',
-      dot: lastRun && lastRun.avgHr && lastRun.avgHr <= z2Hi ? 'ok' : 'warn',
-    }),
-  ]));
-
   // Section 1: Whoop / Ultrahuman Hero Ring Triad + Readiness Coach
-  const todaySteps = latestRing.steps ?? 0;
-  const displaySteps = todaySteps < 500 && prevRing.steps ? prevRing.steps : todaySteps;
-  const stepsLabel = todaySteps < 500 && prevRing.steps ? 'Yest. Steps' : 'Steps';
+  const todaySteps = todayRing.steps !== null ? todayRing.steps : 0;
+  const yestRow = hub.ring.get(addDays(today, -1)) || {};
+  const yestSteps = yestRow.steps !== null && yestRow.steps !== undefined ? yestRow.steps : null;
 
   const toggleDefs = [
     { key: 'ankle', label: 'Ankle swollen', danger: true },
@@ -330,13 +263,16 @@ export function renderTodayView(hub, state, redraw) {
       ]),
       el('div', { class: 'ring-box' }, [
         radialRing({
-          value: displaySteps, max: sTarget, size: 118, stroke: 8,
-          color: displaySteps >= sTarget ? '#10d981' : '#38bdf8',
-          label: stepsLabel,
-          displayValue: displaySteps >= 1000 ? `${(displaySteps / 1000).toFixed(1)}k` : String(displaySteps),
+          value: todaySteps, max: sTarget, size: 118, stroke: 8,
+          color: todaySteps >= sTarget ? '#10d981' : '#38bdf8',
+          label: 'Today Steps',
+          displayValue: todaySteps >= 1000 ? `${(todaySteps / 1000).toFixed(1)}k` : String(todaySteps),
           sublabel: `/ ${(sTarget / 1000).toFixed(1)}k`,
         }),
-        el('span', { class: 'ring-caption', text: stepsIsPrev ? `Steps · ${prettyDate(stepsRing.date, false)}` : 'Steps' }),
+        el('span', {
+          class: 'ring-caption',
+          text: todaySteps === 0 && yestSteps ? `Steps · Today (Yest ${(yestSteps / 1000).toFixed(1)}k)` : 'Steps · Today',
+        }),
       ]),
     ]),
     el('div', { class: 'hero-brief' }, heroBriefKids),
@@ -483,6 +419,7 @@ export function renderTodayView(hub, state, redraw) {
   ]));
 
   // Section 3: Minimalist Week Rail
+  const runPct = wv.weekKm ? Math.min(100, (wv.runKm / wv.weekKm) * 100) : 0;
   const gymSegs = [];
   for (let i = 0; i < Math.max(1, wv.gymPlanned); i++) {
     gymSegs.push(el('span', { class: `seg-dot${i < wv.gymDone ? ' filled' : ''}` }));

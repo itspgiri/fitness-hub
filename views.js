@@ -11,10 +11,10 @@ import {
   planned, prettyDate, pullUpProgress, readiness, recalibratePlan, recentWins, runnaProgress,
   runningPRs, sessionTotals, shoeMileage, shortMonth, sleepDebt7d, sleepSweetSpot,
   stepTarget, strengthPRWall, sum, trackedExercises, weekView, zone2Low, zone2Max,
-} from './plan.js?v=20261127j';
-import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127j';
-import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127j';
-import { CITIES } from './aqi.js?v=20261127j';
+} from './plan.js?v=20261127k';
+import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127k';
+import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127k';
+import { CITIES } from './aqi.js?v=20261127k';
 
 const fmt = (n, d = 1) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : n.toFixed(d));
 const fmtInt = (n) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : Math.round(n).toLocaleString());
@@ -212,32 +212,42 @@ export function renderTodayView(hub, state, redraw) {
         el('span', { class: 'trajectory-score-lbl', text: 'On-Goal' }),
       ]),
     ]),
+    el('div', {
+      class: 'detail-panel',
+      style: {
+        marginBottom: '14px',
+        borderLeft: `3px solid ${traj.skipsLeftMonth === 0 ? 'var(--rose)' : 'var(--amber)'}`,
+        padding: '9px 13px',
+      },
+    }, [
+      el('span', { style: { fontWeight: 600, fontSize: '12.5px' }, text: traj.cheatText }),
+    ]),
     el('div', { class: 'trajectory-bars' }, [
       el('div', {}, [
         el('div', { class: 'pillar-top' }, [
-          el('span', { text: `Plan Mileage (W1–W${traj.curWeek})` }),
-          el('span', { class: 'tabular', text: `${traj.actualSoFar} / ${traj.plannedSoFar} km` }),
+          el('span', { text: `Plan Mileage To Date (W1–W${traj.curWeek})` }),
+          el('span', { class: 'tabular', text: `${traj.actualSoFar} / ${traj.plannedSoFar} km (${traj.planPct}%)` }),
         ]),
         el('div', { class: 'mini-bar', style: { marginTop: '6px' } }, [
-          el('div', { class: 'mini-bar-fill', style: { width: `${Math.max(4, traj.planPct)}%`, background: traj.planPct >= 75 ? 'var(--green)' : 'var(--cyan)' } }),
+          el('div', { class: 'mini-bar-fill', style: { width: `${Math.max(4, traj.planPct)}%`, background: traj.planPct >= 80 ? 'var(--green)' : 'var(--cyan)' } }),
         ]),
       ]),
       el('div', {}, [
         el('div', { class: 'pillar-top' }, [
-          el('span', { text: 'Last 7-Day Momentum' }),
-          el('span', { class: 'tabular', text: `${traj.sessions7} sessions · ${traj.sleep7 ? traj.sleep7.toFixed(1) + 'h' : '—'} sleep` }),
+          el('span', { text: 'Strength (Last 14d)' }),
+          el('span', { class: 'tabular', text: `${traj.lifts14} / 6 lifts (${traj.strengthPct}%)` }),
         ]),
         el('div', { class: 'mini-bar', style: { marginTop: '6px' } }, [
-          el('div', { class: 'mini-bar-fill', style: { width: `${Math.max(4, traj.momentumPct)}%`, background: traj.momentumPct >= 70 ? 'var(--green)' : 'var(--amber)' } }),
+          el('div', { class: 'mini-bar-fill', style: { width: `${Math.max(4, traj.strengthPct)}%`, background: traj.strengthPct >= 80 ? 'var(--green)' : 'var(--amber)' } }),
         ]),
       ]),
       el('div', {}, [
         el('div', { class: 'pillar-top' }, [
-          el('span', { text: '10K Race Runway' }),
-          el('span', { class: 'tabular', text: `Longest ${traj.longestKm.toFixed(1)} / 10 km · ${traj.raceDays ?? '—'}d left` }),
+          el('span', { text: 'Sleep (7d Avg) · Race Runway' }),
+          el('span', { class: 'tabular', text: `${traj.sleep7 ? traj.sleep7.toFixed(1) + 'h' : '—'} · ${traj.raceDays ?? '—'}d left` }),
         ]),
         el('div', { class: 'mini-bar', style: { marginTop: '6px' } }, [
-          el('div', { class: 'mini-bar-fill', style: { width: `${Math.max(4, traj.runwayPct)}%`, background: 'var(--indigo)' } }),
+          el('div', { class: 'mini-bar-fill', style: { width: `${Math.max(4, traj.sleepPct)}%`, background: traj.sleepPct >= 90 ? 'var(--green)' : 'var(--indigo)' } }),
         ]),
       ]),
     ]),

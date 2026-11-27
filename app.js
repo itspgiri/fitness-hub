@@ -1,17 +1,18 @@
 // Main application shell: supports live Google Sheets OAuth (GitHub Pages)
 // and local snapshot preview (localhost). Zero innerHTML, strict CSP-compliant.
 
-import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js';
-import { icon } from './charts.js';
-import { el } from './ui.js';
+import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127b';
+import { icon } from './charts.js?v=20261127b';
+import { el } from './ui.js?v=20261127b';
+import { fetchLiveAqi } from './aqi.js?v=20261127b';
 import {
   fetchLiveSheetSnapshot, isLocalPreviewHost, isOAuthConfigured,
   isSignedIn, signInWithGoogle, signOutGoogle,
-} from './sheets.js';
+} from './sheets.js?v=20261127b';
 import {
   renderMonthlyView, renderRunningView, renderSleepView,
   renderStrengthView, renderTodayView,
-} from './views.js';
+} from './views.js?v=20261127b';
 
 const root = document.getElementById('app');
 const CACHE_KEY = 'fh_tab_cache_v1';
@@ -65,9 +66,28 @@ const state = {
   authBusy: false,
   authError: '',
   mode: 'loading', // 'loading' | 'auth' | 'ready' | 'error'
+  aqiCity: 'delhi',
+  aqiData: null,
+  onCityChange: null,
 };
 
 let hub = null;
+
+async function refreshAqi(cityId) {
+  state.aqiCity = cityId || state.aqiCity;
+  try {
+    state.aqiData = await fetchLiveAqi(state.aqiCity);
+  } catch {
+    state.aqiData = null;
+  }
+  if (state.mode === 'ready') render();
+}
+
+state.onCityChange = (cityId) => {
+  state.aqiData = null;
+  render();
+  refreshAqi(cityId);
+};
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', state.theme);
@@ -326,6 +346,7 @@ function render() {
 
 async function boot() {
   applyTheme();
+  refreshAqi(state.aqiCity);
   if (isOAuthConfigured()) {
     const cached = loadTabCache();
     if (cached) {

@@ -1,18 +1,18 @@
 // Main application shell: supports live Google Sheets OAuth (GitHub Pages)
 // and local snapshot preview (localhost). Zero innerHTML, strict CSP-compliant.
 
-import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127b';
-import { icon } from './charts.js?v=20261127b';
-import { el } from './ui.js?v=20261127b';
-import { fetchLiveAqi } from './aqi.js?v=20261127b';
+import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127c';
+import { icon } from './charts.js?v=20261127c';
+import { el } from './ui.js?v=20261127c';
+import { fetchLiveAqi, fetchLiveAqiCoords, locateBrowserCoords } from './aqi.js?v=20261127c';
 import {
   fetchLiveSheetSnapshot, isLocalPreviewHost, isOAuthConfigured,
   isSignedIn, signInWithGoogle, signOutGoogle,
-} from './sheets.js?v=20261127b';
+} from './sheets.js?v=20261127c';
 import {
   renderMonthlyView, renderRunningView, renderSleepView,
   renderStrengthView, renderTodayView,
-} from './views.js?v=20261127b';
+} from './views.js?v=20261127c';
 
 const root = document.getElementById('app');
 const CACHE_KEY = 'fh_tab_cache_v1';
@@ -66,15 +66,19 @@ const state = {
   authBusy: false,
   authError: '',
   mode: 'loading', // 'loading' | 'auth' | 'ready' | 'error'
-  aqiCity: 'delhi',
+  aqiCity: 'gurugram',
   aqiData: null,
+  aqiLocating: false,
+  aqiError: '',
   onCityChange: null,
+  onLocateMe: null,
 };
 
 let hub = null;
 
 async function refreshAqi(cityId) {
   state.aqiCity = cityId || state.aqiCity;
+  state.aqiError = '';
   try {
     state.aqiData = await fetchLiveAqi(state.aqiCity);
   } catch {
@@ -85,8 +89,26 @@ async function refreshAqi(cityId) {
 
 state.onCityChange = (cityId) => {
   state.aqiData = null;
+  state.aqiError = '';
   render();
   refreshAqi(cityId);
+};
+
+state.onLocateMe = async () => {
+  if (state.aqiLocating) return;
+  state.aqiLocating = true;
+  state.aqiError = '';
+  render();
+  try {
+    const coords = await locateBrowserCoords();
+    state.aqiCity = 'gps';
+    state.aqiData = await fetchLiveAqiCoords(coords);
+  } catch (err) {
+    state.aqiError = err && err.message ? err.message : 'Could not get location.';
+  } finally {
+    state.aqiLocating = false;
+    if (state.mode === 'ready') render();
+  }
 };
 
 function applyTheme() {

@@ -1,9 +1,9 @@
 // Live AQI + Weather Outdoor Run Advisor (Open-Meteo Air Quality + Weather APIs).
-// Zero API key, HTTPS, CORS-enabled, links directly to aqicn.org for station verification.
+// Defaults to Gurugram; supports browser GPS "Locate me" for exact local AQI without storing any address.
 
 export const CITIES = [
-  { id: 'delhi', name: 'New Delhi', lat: 28.6139, lon: 77.2090, aqicn: 'https://aqicn.org/city/delhi/' },
   { id: 'gurugram', name: 'Gurugram', lat: 28.4595, lon: 77.0266, aqicn: 'https://aqicn.org/city/india/gurugram/' },
+  { id: 'delhi', name: 'New Delhi', lat: 28.6139, lon: 77.2090, aqicn: 'https://aqicn.org/city/delhi/' },
   { id: 'noida', name: 'Noida', lat: 28.5355, lon: 77.3910, aqicn: 'https://aqicn.org/city/india/noida/' },
   { id: 'bengaluru', name: 'Bengaluru', lat: 12.9716, lon: 77.5946, aqicn: 'https://aqicn.org/city/india/bangalore/' },
   { id: 'mumbai', name: 'Mumbai', lat: 19.0760, lon: 72.8777, aqicn: 'https://aqicn.org/city/india/mumbai/' },
@@ -28,10 +28,9 @@ export function aqiVerdict(aqi) {
   return { level: 'very_unhealthy', label: 'Stay Indoors', action: 'Very unhealthy AQI — treadmill or strength only.', tone: 'stop', color: 'var(--rose)' };
 }
 
-export async function fetchLiveAqi(cityId = 'delhi') {
-  const city = CITIES.find((c) => c.id === cityId) || CITIES[0];
-  const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${city.lat}&longitude=${city.lon}&current=us_aqi,pm2_5,pm10`;
-  const wxUrl = `https://api.open-meteo.com/v1/forecast?latitude=${city.lat}&longitude=${city.lon}&current=temperature_2m,relative_humidity_2m`;
+export async function fetchLiveAqiCoords({ lat, lon, name, aqicn }) {
+  const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm2_5,pm10`;
+  const wxUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m`;
 
   const [aqResp, wxResp] = await Promise.all([
     fetch(aqUrl, { cache: 'no-store' }),
@@ -45,7 +44,7 @@ export async function fetchLiveAqi(cityId = 'delhi') {
   const usAqi = Number.isFinite(Number(curAq.us_aqi)) ? Math.round(Number(curAq.us_aqi)) : null;
 
   return {
-    city,
+    city: { name, aqicn },
     aqi: usAqi,
     pm25: Number.isFinite(Number(curAq.pm2_5)) ? Number(curAq.pm2_5) : null,
     pm10: Number.isFinite(Number(curAq.pm10)) ? Number(curAq.pm10) : null,
@@ -53,4 +52,28 @@ export async function fetchLiveAqi(cityId = 'delhi') {
     humidity: Number.isFinite(Number(curWx.relative_humidity_2m)) ? Math.round(Number(curWx.relative_humidity_2m)) : null,
     verdict: aqiVerdict(usAqi),
   };
+}
+
+export async function fetchLiveAqi(cityId = 'gurugram') {
+  const city = CITIES.find((c) => c.id === cityId) || CITIES[0];
+  return fetchLiveAqiCoords(city);
+}
+
+export function locateBrowserCoords() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Location not supported by this browser.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({
+        lat: Number(pos.coords.latitude.toFixed(4)),
+        lon: Number(pos.coords.longitude.toFixed(4)),
+        name: 'My Location',
+        aqicn: 'https://aqicn.org/here/',
+      }),
+      () => reject(new Error('Location permission denied.')),
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
+    );
+  });
 }

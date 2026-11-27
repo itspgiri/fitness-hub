@@ -10,10 +10,10 @@ import {
   latestRingWith, nextRace, planned, prettyDate, pullUpProgress, readiness, recentWins,
   runnaProgress, sessionTotals, shoeMileage, shortMonth, stepTarget, sum,
   trackedExercises, weekView, zone2Low, zone2Max,
-} from './plan.js?v=20261127b';
-import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127b';
-import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127b';
-import { CITIES } from './aqi.js?v=20261127b';
+} from './plan.js?v=20261127c';
+import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127c';
+import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127c';
+import { CITIES } from './aqi.js?v=20261127c';
 
 const fmt = (n, d = 1) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : n.toFixed(d));
 const fmtInt = (n) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : Math.round(n).toLocaleString());
@@ -110,24 +110,39 @@ export function renderTodayView(hub, state, redraw) {
   // Live Outdoor Run AQI & Spontaneous Run Advisor Bar
   const aq = state.aqiData;
   const cityObj = CITIES.find((c) => c.id === state.aqiCity) || CITIES[0];
+  const locName = aq && aq.city && aq.city.name ? aq.city.name : cityObj.name;
+  const aqicnUrl = aq && aq.city && aq.city.aqicn ? aq.city.aqicn : cityObj.aqicn;
   const verdict = aq ? aq.verdict : { label: 'Checking live AQI…', action: 'Loading outdoor air quality & temperature', tone: 'info' };
-  const spontaneousAdvice = state.toggles.ankle
-    ? 'Ankle swollen — skip running (outdoor or treadmill) today.'
-    : aq
-      ? `${verdict.action} · Spontaneous run cap: 3–5 km easy ≤ ${z2Hi} bpm${aq.tempC !== null ? ` · ${aq.tempC.toFixed(1)} °C` : ''}${aq.humidity !== null ? ` · ${aq.humidity}% RH` : ''}${aq.pm25 !== null ? ` · PM2.5 ${aq.pm25}` : ''}`
-      : verdict.action;
+  const spontaneousAdvice = state.aqiError
+    ? state.aqiError
+    : state.toggles.ankle
+      ? 'Ankle swollen — skip running (outdoor or treadmill) today.'
+      : aq
+        ? `${verdict.action} · Spontaneous run: 3–5 km easy ≤ ${z2Hi} bpm${aq.tempC !== null ? ` · ${aq.tempC.toFixed(1)} °C` : ''}${aq.humidity !== null ? ` · ${aq.humidity}% RH` : ''}${aq.pm25 !== null ? ` · PM2.5 ${aq.pm25}` : ''}`
+        : verdict.action;
 
   const citySelect = el('select', {
     class: 'select-input',
     'aria-label': 'Select city for AQI',
     onChange: (e) => { if (state.onCityChange) state.onCityChange(e.target.value); },
-  }, CITIES.map((c) => el('option', {
-    value: c.id,
-    selected: c.id === state.aqiCity ? 'selected' : null,
-    text: c.name,
-  })));
+  }, [
+    ...CITIES.map((c) => el('option', {
+      value: c.id,
+      selected: c.id === state.aqiCity ? 'selected' : null,
+      text: c.name,
+    })),
+    ...(state.aqiCity === 'gps' ? [el('option', { value: 'gps', selected: 'selected', text: 'My Location (GPS)' })] : []),
+  ]);
 
-  const aqicnLink = safeExternalLink(cityObj.aqicn, 'AQICN ↗');
+  const locateBtn = el('button', {
+    type: 'button',
+    class: `chip${state.aqiCity === 'gps' ? ' active' : ''}`,
+    disabled: state.aqiLocating ? 'disabled' : null,
+    text: state.aqiLocating ? 'Locating…' : 'Locate me',
+    onClick: () => { if (state.onLocateMe) state.onLocateMe(); },
+  });
+
+  const aqicnLink = safeExternalLink(aqicnUrl, 'AQICN ↗');
 
   frag.appendChild(el('section', { class: 'aqi-bar' }, [
     el('div', { class: 'aqi-left' }, [
@@ -138,13 +153,14 @@ export function renderTodayView(hub, state, redraw) {
       el('div', { style: { minWidth: 0 } }, [
         el('div', {
           class: 'aqi-title',
-          text: `Outdoor Run Check: ${state.toggles.ankle ? 'Skip Run (Ankle)' : verdict.label}`,
+          text: `${locName} Outdoor Run: ${state.toggles.ankle ? 'Skip Run (Ankle)' : verdict.label}`,
         }),
         el('div', { class: 'aqi-sub', text: spontaneousAdvice }),
       ]),
     ]),
     el('div', { class: 'aqi-right' }, [
       citySelect,
+      locateBtn,
       aqicnLink,
     ]),
   ]));

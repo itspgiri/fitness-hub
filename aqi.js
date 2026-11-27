@@ -2,7 +2,7 @@
 // Defaults to Gurugram; supports browser GPS "Locate me" for exact local AQI without storing any address.
 
 export const CITIES = [
-  { id: 'gurugram', name: 'Gurugram', lat: 28.4595, lon: 77.0266, aqicn: 'https://aqicn.org/city/india/gurugram/' },
+  { id: 'gurugram', name: 'Gurugram · MG Road Metro', lat: 28.4796, lon: 77.0801, aqicn: 'https://aqicn.org/city/india/gurugram/' },
   { id: 'delhi', name: 'New Delhi', lat: 28.6139, lon: 77.2090, aqicn: 'https://aqicn.org/city/delhi/' },
   { id: 'noida', name: 'Noida', lat: 28.5355, lon: 77.3910, aqicn: 'https://aqicn.org/city/india/noida/' },
   { id: 'bengaluru', name: 'Bengaluru', lat: 12.9716, lon: 77.5946, aqicn: 'https://aqicn.org/city/india/bangalore/' },

@@ -1,18 +1,18 @@
 // Main application shell: supports live Google Sheets OAuth (GitHub Pages)
 // and local snapshot preview (localhost). Zero innerHTML, strict CSP-compliant.
 
-import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127c';
-import { icon } from './charts.js?v=20261127c';
-import { el } from './ui.js?v=20261127c';
-import { fetchLiveAqi, fetchLiveAqiCoords, locateBrowserCoords } from './aqi.js?v=20261127c';
+import { buildHub, footRuns, freshness, nextRace, todayIST } from './plan.js?v=20261127d';
+import { icon } from './charts.js?v=20261127d';
+import { el } from './ui.js?v=20261127d';
+import { fetchLiveAqi, fetchLiveAqiCoords, locateBrowserCoords } from './aqi.js?v=20261127d';
 import {
   fetchLiveSheetSnapshot, isLocalPreviewHost, isOAuthConfigured,
   isSignedIn, signInWithGoogle, signOutGoogle,
-} from './sheets.js?v=20261127c';
+} from './sheets.js?v=20261127d';
 import {
   renderMonthlyView, renderRunningView, renderSleepView,
   renderStrengthView, renderTodayView,
-} from './views.js?v=20261127c';
+} from './views.js?v=20261127d';
 
 const root = document.getElementById('app');
 const CACHE_KEY = 'fh_tab_cache_v1';

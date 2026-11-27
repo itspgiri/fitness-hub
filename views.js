@@ -10,10 +10,10 @@ import {
   latestRingWith, nextRace, planned, prettyDate, pullUpProgress, readiness, recentWins,
   runnaProgress, sessionTotals, shoeMileage, shortMonth, stepTarget, sum,
   trackedExercises, weekView, zone2Low, zone2Max,
-} from './plan.js?v=20261127c';
-import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127c';
-import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127c';
-import { CITIES } from './aqi.js?v=20261127c';
+} from './plan.js?v=20261127d';
+import { barChart, icon, lineChart, radialRing, zoneBar } from './charts.js?v=20261127d';
+import { el, kpiCard, legend, pill, safeExternalLink } from './ui.js?v=20261127d';
+import { CITIES } from './aqi.js?v=20261127d';
 
 const fmt = (n, d = 1) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : n.toFixed(d));
 const fmtInt = (n) => (n === null || n === undefined || !Number.isFinite(n) ? '—' : Math.round(n).toLocaleString());

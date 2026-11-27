@@ -63,7 +63,7 @@ async function handleSignIn() {
   state.authError = '';
   render();
   try {
-    await signInWithGoogle('');
+    await signInWithGoogle('select_account');
     const snap = await fetchLiveSheetSnapshot();
     hub = buildHub(snap);
     state.today = todayIST();

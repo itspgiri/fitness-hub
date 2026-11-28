@@ -679,10 +679,18 @@ export function goalTrajectory(hub, today, toggles = {}) {
   plannedToDate = Math.round(plannedToDate * 10) / 10;
   const planPct = plannedToDate > 0 ? Math.min(125, Math.round((actualToDate / plannedToDate) * 100)) : 100;
 
-  // 2. Strength Consistency (last 14 days vs 6 planned lifts — allows >100% bonus)
+  // 2. Strength Hybrid (last 14 days: 50% Sessions vs 6 + 50% Working Sets vs 90 — allows >100% bonus)
   const from14 = addDays(today, -13);
-  const lifts14 = hub.sessions.filter((s) => s.date >= from14 && s.date <= today).length;
-  const strengthPct = Math.min(125, Math.round((lifts14 / 6) * 100));
+  const sessions14 = hub.sessions.filter((s) => s.date >= from14 && s.date <= today);
+  const lifts14 = sessions14.length;
+  const workingSets14 = sum(sessions14.map((s) => {
+    const work = s.sets.filter((st) => st.type !== 'Warm-up').length;
+    // Summary-only non-Hevy gym workouts (0 parsed sets) get a fair 12-set credit so ad-hoc Strava lifts still count
+    return work > 0 ? work : (s.sets.length > 0 ? s.sets.length : 12);
+  }));
+  const sessPct14 = Math.min(125, Math.round((lifts14 / 6) * 100));
+  const setsPct14 = Math.min(125, Math.round((workingSets14 / 90) * 100));
+  const strengthPct = Math.min(125, Math.round(sessPct14 * 0.5 + setsPct14 * 0.5));
 
   // 3. Sleep Consistency (last 7 days vs 7.5h target)
   const from7 = addDays(today, -6);
@@ -786,6 +794,7 @@ export function goalTrajectory(hub, today, toggles = {}) {
     planPct,
     sessions7,
     lifts14,
+    workingSets14,
     strengthPct,
     sleep7,
     sleepPct,

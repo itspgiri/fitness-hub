@@ -775,8 +775,8 @@ export function goalTrajectory(hub, today, toggles = {}) {
   }
 
   const cheatText = skipsLeftMonth > 0
-    ? `Skip budget: ${skipsLeftWeek} left this week · ${skipsLeftMonth} left this month (${monthActualTotal}/${monthPlannedSessions} workouts done: ${monthActualRuns} runs + ${monthActualLifts} lifts, incl. ad-hoc).`
-    : `⚠️ 0 skips left this month (${monthActualTotal}/${monthPlannedSessions} total workouts done: ${monthActualRuns} runs + ${monthActualLifts} lifts → ${monthMissedSessions} short vs ${monthBudget} max) — lock in your remaining sessions!`;
+    ? `Skips left: ${skipsLeftWeek} this week · ${skipsLeftMonth} this month (${monthActualTotal}/${monthPlannedSessions} done)`
+    : `0 skips left this month · ${monthActualTotal}/${monthPlannedSessions} done — no more skipping!`;
 
   return {
     overallScore,
